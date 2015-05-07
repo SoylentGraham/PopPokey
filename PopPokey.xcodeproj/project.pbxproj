@@ -212,6 +212,7 @@
 		FB9C89B91A8A63FE00931EFB /* CoreData.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreData.framework; path = System/Library/Frameworks/CoreData.framework; sourceTree = SDKROOT; };
 		FBA28D0E1AFA329E00CBF5D9 /* PopPokey.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = PopPokey.cpp; path = src/PopPokey.cpp; sourceTree = SOURCE_ROOT; };
 		FBA28D0F1AFA329E00CBF5D9 /* PopPokey.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = PopPokey.h; path = src/PopPokey.h; sourceTree = SOURCE_ROOT; };
+		FBA28D111AFBCAEB00CBF5D9 /* SoyData.inl */ = {isa = PBXFileReference; lastKnownFileType = text; name = SoyData.inl; path = src/SoyData.inl; sourceTree = "<group>"; };
 		FBC3A0DF1A308648009DA49E /* SoyScope.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = SoyScope.cpp; path = ../ofxSoylent/src/SoyScope.cpp; sourceTree = "<group>"; };
 		FBC3A0E01A308648009DA49E /* SoyScope.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SoyScope.h; path = ../ofxSoylent/src/SoyScope.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -363,6 +364,7 @@
 				FB8A067C1A2E69340099596C /* PopMain.cpp */,
 				FB8A067D1A2E69340099596C /* PopMain.h */,
 				FB8A067E1A2E69340099596C /* SoyData.cpp */,
+				FBA28D111AFBCAEB00CBF5D9 /* SoyData.inl */,
 				FB8A067F1A2E69340099596C /* SoyData.h */,
 			);
 			name = poplib;

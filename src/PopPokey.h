@@ -8,11 +8,30 @@
 
 
 
+namespace TPokeyCommand
+{
+	enum Type : unsigned char
+	{
+		Invalid					= 0xff,
+		UnknownReply			= 0xfe,
+
+		GetDeviceMeta			= 0x00,
+		GetUserId				= 0x03,
+	};
+	DECLARE_SOYENUM( TPokeyCommand );
+	
+	unsigned char	CalculateChecksum(const unsigned char* Header7);
+};
+
+
 
 
 
 class TProtocolPokey : public TProtocol
 {
+public:
+	std::atomic<unsigned char>	mRequestCounter;	//	gr: per device, but establish when this resets
+	
 public:
 	TProtocolPokey()
 	{
@@ -86,6 +105,12 @@ public:
 		mPokeyChannels.PushBack( ChannelRef );
 	}
 	
+public:
+	void				SendGetDeviceMeta();
+	void				SendGetUserMeta();
+	void				SendJob(TJob& Job);
+	
+private:
 	Array<SoyRef>		mPokeyChannels;
 	TChannelManager&	mChannels;
 };
@@ -101,6 +126,7 @@ public:
 
 	void			OnInitPokey(TJobAndChannel& JobAndChannel);
 	void			OnPopGridEvent(TJobAndChannel& JobAndChannel);
+	void			OnUnknownPokeyReply(TJobAndChannel& JobAndChannel);
 	
 	
 public:

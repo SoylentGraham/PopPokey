@@ -20,6 +20,7 @@ namespace TPokeyCommand
 		//	real codes
 		GetDeviceMeta			= 0x00,
 		GetUserId				= 0x03,
+		GetDeviceState			= 0xCC,
 	};
 	DECLARE_SOYENUM( TPokeyCommand );
 	
@@ -50,6 +51,9 @@ public:
 	
 	virtual bool		FixParamFormat(TJobParam& Param,std::stringstream& Error) override;
 	
+	bool				DecodeReply(TJob& Job,const BufferArray<unsigned char,64>& Data);
+	bool				DecodeGetDeviceStatus(TJob& Job,const BufferArray<unsigned char,64>& Data);
+
 public:
 };
 
@@ -102,6 +106,8 @@ public:
 	{
 	}
 	
+	bool			IsValid() const	{	return mSerial != -1;	}
+	
 public:
 	std::string		mAddress;
 	int				mSerial;
@@ -123,6 +129,7 @@ public:
 public:
 	void				SendGetDeviceMeta();
 	void				SendGetUserMeta();
+	void				SendGetDeviceState();
 	void				SendJob(TJob& Job);
 	
 private:
@@ -154,8 +161,13 @@ public:
 	void			OnDiscoverPokey(TJobAndChannel& JobAndChannel);
 	void			OnPopGridEvent(TJobAndChannel& JobAndChannel);
 	void			OnUnknownPokeyReply(TJobAndChannel& JobAndChannel);
+	void			OnPokeyPollReply(TJobAndChannel& JobAndChannel);
 	
 	TPokeyMeta		FindPokey(const TPokeyMeta& Pokey);
+	TPokeyMeta		FindPokey(SoyRef ChannelRef);
+
+	void			UpdatePinState(int Serial,const ArrayBridge<char>& Pins);
+	void			UpdatePinState(int Serial,uint64 Pins);
 	
 public:
 	Soy::Platform::TConsoleApp	mConsoleApp;

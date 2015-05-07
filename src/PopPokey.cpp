@@ -24,6 +24,8 @@ std::map<TPokeyCommand::Type,std::string> TPokeyCommand::EnumMap =
 	
 	{ TPokeyCommand::GetDeviceMeta,	"GetDeviceMeta" },
 	{ TPokeyCommand::GetUserId,	"GetUserId" },
+	{ TPokeyCommand::GetDeviceState,	"GetDeviceState" },
+	
 };
 
 
@@ -64,8 +66,9 @@ TPollPokeyThread::TPollPokeyThread(TChannelManager& Channels) :
 
 bool TPollPokeyThread::Iteration()
 {
-	SendGetDeviceMeta();
-	SendGetUserMeta();
+//	SendGetDeviceMeta();
+//	SendGetUserMeta();
+	SendGetDeviceState();
 	
 	return true;
 }
@@ -81,6 +84,13 @@ void TPollPokeyThread::SendGetUserMeta()
 {
 	TJob Job;
 	Job.mParams.mCommand = TPokeyCommand::ToString( TPokeyCommand::GetUserId );
+	SendJob( Job );
+}
+
+void TPollPokeyThread::SendGetDeviceState()
+{
+	TJob Job;
+	Job.mParams.mCommand = TPokeyCommand::ToString( TPokeyCommand::GetDeviceState );
 	SendJob( Job );
 }
 
@@ -115,6 +125,78 @@ unsigned char TPokeyCommand::CalculateChecksum(const unsigned char * Header7)
 }
 
 
+bool TProtocolPokey::DecodeGetDeviceStatus(TJob& Job,const BufferArray<unsigned char,64>& Data)
+{
+	//	generate string of pin states
+	std::stringstream Pins;
+	for (int i = 0; i < 55; i++)
+	{
+		bool PinState = (Data[8 + (i / 8)] & (1 << (i % 8))) > 0;
+		Pins << (PinState ? '1':'0');
+	}
+	
+	Job.mParams.AddParam("pins", Pins.str() );
+
+	return true;
+}
+
+
+template<typename TYPE>
+void TypeToHex(const TYPE Value,std::ostream& String)
+{
+	int TypeNibbles = 2*sizeof(Value);
+	for ( int i=0;	i<TypeNibbles;	i++ )
+	{
+		char hex = Value >> ((TypeNibbles-1-i)*4);
+		hex &= (1<<4)-1;
+		if ( hex >= 10 )
+			hex += 'A' - 10;
+		else
+			hex += '0';
+		String << hex;
+	}
+}
+
+
+
+bool TProtocolPokey::DecodeReply(TJob& Job,const BufferArray<unsigned char,64>& Data)
+{
+	//	first 8 bytes are a header
+	auto RequestId = Data[0];
+	auto Cmd = static_cast<TPokeyCommand::Type>(Data[1]);
+
+	if ( !TPokeyCommand::IsValid(Cmd) )
+		Cmd = TPokeyCommand::Invalid;
+
+	Job.mParams.mCommand = TJobParams::CommandReplyPrefix + TPokeyCommand::ToString( Cmd );
+	Job.mParams.AddParam("requestid", static_cast<int>(RequestId) );
+	
+	switch ( Cmd )
+	{
+		case TPokeyCommand::GetDeviceState:
+			if ( DecodeGetDeviceStatus( Job, Data ) )
+				return true;
+			break;
+
+		default:
+			break;
+	}
+	
+	//	unknown, put all data as hex
+	std::stringstream DataString;
+	for ( int i=0;	i<Data.GetSize();	i++ )
+	{
+		if ( i > 0 )
+			DataString << " ";
+		TypeToHex( Data[i], DataString );
+	}
+
+	Job.mParams.AddParam("data", DataString.str() );
+	
+	return true;
+}
+
+
 TDecodeResult::Type TProtocolPokey::DecodeHeader(TJob& Job,TChannelStream& Stream)
 {
 	//	read the first byte, if it's 0xAA we know it's a reply packet
@@ -124,8 +206,6 @@ TDecodeResult::Type TProtocolPokey::DecodeHeader(TJob& Job,TChannelStream& Strea
 	if ( !Stream.Pop( 1, DataBridge ) )
 		return TDecodeResult::Waiting;
 	
-	bool Success = false;
-	
 	if ( static_cast<unsigned char>(Data[0]) == 0xAA )
 	{
 		if ( !Stream.Pop( 64-1, DataBridge ) )
@@ -134,22 +214,12 @@ TDecodeResult::Type TProtocolPokey::DecodeHeader(TJob& Job,TChannelStream& Strea
 			return TDecodeResult::Waiting;
 		}
 		
-		auto RequestId = Data[6];
-		/*
-		 deviceStat->DeviceData.SerialNumber = (int)(tempIn[2]) * 256 + (int)tempIn[3];
-		 deviceStat->DeviceData.FirmwareVersionMajor = tempIn[4];
-		 deviceStat->DeviceData.FirmwareVersionMinor = tempIn[5];
-		 */
-		Job.mParams.mCommand = TJobParams::CommandReplyPrefix + TPokeyCommand::ToString( TPokeyCommand::UnknownReply );
-		Job.mParams.AddParam("RequestId", static_cast<int>(RequestId) );
-		Job.mParams.AddParam("data0", static_cast<int>(Data[0]) );
-		Job.mParams.AddParam("data1", static_cast<int>(Data[1]) );
-		Job.mParams.AddParam("data2", static_cast<int>(Data[2]) );
-		Job.mParams.AddParam("data3", static_cast<int>(Data[3]) );
-		Job.mParams.AddParam("data4", static_cast<int>(Data[4]) );
-		Job.mParams.AddParam("data5", static_cast<int>(Data[5]) );
-		Job.mParams.AddParam("data6", static_cast<int>(Data[6]) );
-		Job.mParams.AddParam("data7", static_cast<int>(Data[7]) );
+		BufferArray<unsigned char,64> UData;
+		GetArrayBridge(UData).PushBackReinterpret( Data.GetArray(), Data.GetDataSize() );
+		
+		if ( !DecodeReply( Job, UData ) )
+			return TDecodeResult::Ignore;
+
 		return TDecodeResult::Success;
 	}
 	else
@@ -162,7 +232,6 @@ TDecodeResult::Type TProtocolPokey::DecodeHeader(TJob& Job,TChannelStream& Strea
 		}
 		
 		//	gr: not sure why but have to use some data as signed and some as unsigned... not making sense to me, maybe encoding done wrong on pokey side
-		auto& SData = Data;
 		BufferArray<unsigned char,14> UData;
 		GetArrayBridge(UData).PushBackReinterpret( Data.GetArray(), Data.GetDataSize() );
 		
@@ -220,6 +289,7 @@ bool TProtocolPokey::Encode(const TJob& Job,Array<char>& Output)
 	switch ( Command )
 	{
 		case TPokeyCommand::GetDeviceMeta:
+		case TPokeyCommand::GetDeviceState:
 			data2 = 0;
 			data3 = 0;
 			data4 = 0;
@@ -323,6 +393,8 @@ TPopPokey::TPopPokey() :
 	AddJobHandler( TJobParams::CommandReplyPrefix + TPokeyCommand::ToString( TPokeyCommand::UnknownReply ), TParameterTraits(), *this, &TPopPokey::OnUnknownPokeyReply );
 	
 	AddJobHandler( TJobParams::CommandReplyPrefix + TPokeyCommand::ToString( TPokeyCommand::Discover ), TParameterTraits(), *this, &TPopPokey::OnDiscoverPokey );
+
+	AddJobHandler( TJobParams::CommandReplyPrefix + TPokeyCommand::ToString( TPokeyCommand::GetDeviceState ), TParameterTraits(), *this, &TPopPokey::OnPokeyPollReply );
 	
 	mPollPokeyThread.reset( new TPollPokeyThread( static_cast<TChannelManager&>(*this) ) );
 	mDiscoverPokeyThread.reset( new TPokeyDiscoverThread( mDiscoverPokeyChannel ) );
@@ -351,6 +423,45 @@ TPokeyMeta TPopPokey::FindPokey(const TPokeyMeta &Pokey)
 	return TPokeyMeta();
 }
 
+TPokeyMeta TPopPokey::FindPokey(SoyRef ChannelRef)
+{
+	for ( int i=0;	i<mPokeys.GetSize();	i++ )
+	{
+		auto& Match = mPokeys[i];
+		if ( Match.mChannelRef == ChannelRef )
+			return Match;
+	}
+	
+	return TPokeyMeta();
+}
+
+
+void TPopPokey::OnPokeyPollReply(TJobAndChannel& JobAndChannel)
+{
+	//	find pokey this is from, we don't have a serial or any id per-device so match channel
+	auto& Job = JobAndChannel.GetJob();
+	auto Pokey = FindPokey( Job.mChannelMeta.mChannelRef );
+	if ( !Pokey.IsValid() )
+	{
+		std::Debug << "got pokey poll reply, but didn't match pokey ref " << Job.mChannelMeta.mChannelRef << std::endl;
+		return;
+	}
+	
+	//	read pins as an array of chars
+	Array<char> Pins;
+	if ( !Job.mParams.GetParamAs("pins", Pins ) )
+	{
+		std::Debug << "failed to get pokey poll pin data for " << Job.mChannelMeta.mChannelRef << std::endl;
+		std::Debug << Job.mParams << std::endl;
+		return;
+	}
+	
+	std::Debug << "pins: " << Job.mParams.GetParamAs<std::string>("pins") << std::endl;
+	
+	UpdatePinState( Pokey.mSerial, GetArrayBridge(Pins) );
+}
+
+
 void TPopPokey::OnDiscoverPokey(TJobAndChannel& JobAndChannel)
 {
 	//	grab it's serial and see if it already exists
@@ -361,6 +472,11 @@ void TPopPokey::OnDiscoverPokey(TJobAndChannel& JobAndChannel)
 	TPokeyMeta Pokey;
 	Pokey.mAddress = Job.mParams.GetParamAs<std::string>("address");
 	Pokey.mSerial = Job.mParams.GetParamAs<int>("serial");
+	if ( !Pokey.IsValid() )
+	{
+		std::Debug << "got pokey discovery with invalid params; " << Job.mParams << std::endl;
+		return;
+	}
 	
 	//	find existing pokey
 	auto ExistingPokey = FindPokey( Pokey );
@@ -370,7 +486,7 @@ void TPopPokey::OnDiscoverPokey(TJobAndChannel& JobAndChannel)
 	//	same serial, same address, already exists
 	if ( ExistingPokey.mAddress == Pokey.mAddress && ExistingPokey.mSerial == Pokey.mSerial )
 	{
-		std::Debug << "Pokey #" << Pokey.mSerial << " @" << Pokey.mAddress << " already exists" << std::endl;
+		//std::Debug << "Pokey #" << Pokey.mSerial << " @" << Pokey.mAddress << " already exists" << std::endl;
 		return;
 	}
 	
@@ -439,11 +555,21 @@ void TPopPokey::OnUnknownPokeyReply(TJobAndChannel& JobAndChannel)
 	TChannel& Channel = JobAndChannel;
 	
 	std::Debug << "got pokey reply from " << Channel.GetChannelRef() << ": RequestId #" << Job.mParams.GetParamAs<int>("requestid") << std::endl;
-
-	//	no reply!
+	std::Debug << Job.mParams << std::endl;
 }
 
+void TPopPokey::UpdatePinState(int Serial,const ArrayBridge<char>& Pins)
+{
+	uint64 Pin64 = 0x0;
+	for ( int i=0;	i<Pins.GetSize();	i++ )
+		Pin64 |= Pins[i] << i;
+	UpdatePinState( Serial, Pin64 );
+}
 
+void TPopPokey::UpdatePinState(int Serial,uint64 Pins)
+{
+	//	update grid
+}
 
 //	horrible global for lambda
 std::shared_ptr<TChannel> gStdioChannel;

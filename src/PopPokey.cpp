@@ -13,16 +13,45 @@
 #include <TChannelLiteral.h>
 #include <RemoteArray.h>
 
+std::atomic<unsigned char> TProtocolPokey::mRequestCounter(0);
 
 
 std::map<TPokeyCommand::Type,std::string> TPokeyCommand::EnumMap =
 {
 	{ TPokeyCommand::Invalid,		"Invalid" },
 	{ TPokeyCommand::UnknownReply,	"UnknownReply" },
+	{ TPokeyCommand::Discover,	"Discover" },
 	
 	{ TPokeyCommand::GetDeviceMeta,	"GetDeviceMeta" },
 	{ TPokeyCommand::GetUserId,	"GetUserId" },
 };
+
+
+
+	
+	
+TPokeyDiscoverThread::TPokeyDiscoverThread(std::shared_ptr<TChannel>& Channel) :
+	mChannel		( Channel ),
+	SoyWorkerThread	( Soy::GetTypeName(*this), SoyWorkerWaitMode::Sleep )
+{
+	Start();
+}
+
+bool TPokeyDiscoverThread::Iteration()
+{
+	auto Channel = mChannel;
+	if ( !Channel )
+		return true;
+	
+	//	send hello world to look for new pokeys
+	TJob Job;
+	Job.mParams.mCommand = TPokeyCommand::ToString( TPokeyCommand::Discover );
+	Job.mChannelMeta.mChannelRef = Channel->GetChannelRef();
+	Channel->SendCommand( Job );
+	return true;
+}
+
+
 
 
 TPollPokeyThread::TPollPokeyThread(TChannelManager& Channels) :
@@ -88,42 +117,75 @@ unsigned char TPokeyCommand::CalculateChecksum(const unsigned char * Header7)
 
 TDecodeResult::Type TProtocolPokey::DecodeHeader(TJob& Job,TChannelStream& Stream)
 {
-	//	read out 64 bytes
+	//	read the first byte, if it's 0xAA we know it's a reply packet
+	//	if it's not, we have to assume it's a broadcast reply with an IP...
 	Array<char> Data;
-	if ( !Stream.Pop( 64, GetArrayBridge(Data) ) )
+	auto DataBridge = GetArrayBridge(Data);
+	if ( !Stream.Pop( 1, DataBridge ) )
 		return TDecodeResult::Waiting;
 	
-	//	bad header... eat all bytes up to 0xAA and unpop the rest and try again
-	if ( static_cast<unsigned char>(Data[0]) != 0xAA )
+	bool Success = false;
+	
+	if ( static_cast<unsigned char>(Data[0]) == 0xAA )
 	{
-		while ( !Data.IsEmpty() && static_cast<unsigned char>(Data[0]) != 0xAA )
+		if ( !Stream.Pop( 64-1, DataBridge ) )
 		{
-			Data.PopAt(0);
+			Stream.UnPop(DataBridge);
+			return TDecodeResult::Waiting;
 		}
-		//	restore data (should be empty or start with AA) and try again
-		Stream.UnPop( GetArrayBridge(Data) );
-		return TDecodeResult::Waiting;
+		
+		auto RequestId = Data[6];
+		/*
+		 deviceStat->DeviceData.SerialNumber = (int)(tempIn[2]) * 256 + (int)tempIn[3];
+		 deviceStat->DeviceData.FirmwareVersionMajor = tempIn[4];
+		 deviceStat->DeviceData.FirmwareVersionMinor = tempIn[5];
+		 */
+		Job.mParams.mCommand = TJobParams::CommandReplyPrefix + TPokeyCommand::ToString( TPokeyCommand::UnknownReply );
+		Job.mParams.AddParam("RequestId", static_cast<int>(RequestId) );
+		Job.mParams.AddParam("data0", static_cast<int>(Data[0]) );
+		Job.mParams.AddParam("data1", static_cast<int>(Data[1]) );
+		Job.mParams.AddParam("data2", static_cast<int>(Data[2]) );
+		Job.mParams.AddParam("data3", static_cast<int>(Data[3]) );
+		Job.mParams.AddParam("data4", static_cast<int>(Data[4]) );
+		Job.mParams.AddParam("data5", static_cast<int>(Data[5]) );
+		Job.mParams.AddParam("data6", static_cast<int>(Data[6]) );
+		Job.mParams.AddParam("data7", static_cast<int>(Data[7]) );
+		return TDecodeResult::Success;
 	}
+	else
+	{
+		//	assume is broadcast reply
+		if ( !Stream.Pop( 14-1, DataBridge ) )
+		{
+			Stream.UnPop(DataBridge);
+			return TDecodeResult::Waiting;
+		}
+		
+		//	gr: not sure why but have to use some data as signed and some as unsigned... not making sense to me, maybe encoding done wrong on pokey side
+		auto& SData = Data;
+		BufferArray<unsigned char,14> UData;
+		GetArrayBridge(UData).PushBackReinterpret( Data.GetArray(), Data.GetDataSize() );
+		
+		int Serial = ((int)UData[1]<<8) | (int)UData[2];
+		
+		std::stringstream Version;
+		Version << (int)UData[3] << "." << (int)UData[4];
+		
+		std::stringstream Address;
+		Address << (int)UData[5] << "." << (int)UData[6] << "." << (int)UData[7] << "." << (int)UData[8];
 
-	//	extract data
-	auto RequestId = Data[6];
-	/*
-	deviceStat->DeviceData.SerialNumber = (int)(tempIn[2]) * 256 + (int)tempIn[3];
-	deviceStat->DeviceData.FirmwareVersionMajor = tempIn[4];
-	deviceStat->DeviceData.FirmwareVersionMinor = tempIn[5];
-*/
-	Job.mParams.mCommand = TJobParams::CommandReplyPrefix + TPokeyCommand::ToString( TPokeyCommand::UnknownReply );
-	Job.mParams.AddParam("RequestId", static_cast<int>(RequestId) );
-	Job.mParams.AddParam("data0", static_cast<int>(Data[0]) );
-	Job.mParams.AddParam("data1", static_cast<int>(Data[1]) );
-	Job.mParams.AddParam("data2", static_cast<int>(Data[2]) );
-	Job.mParams.AddParam("data3", static_cast<int>(Data[3]) );
-	Job.mParams.AddParam("data4", static_cast<int>(Data[4]) );
-	Job.mParams.AddParam("data5", static_cast<int>(Data[5]) );
-	Job.mParams.AddParam("data6", static_cast<int>(Data[6]) );
-	Job.mParams.AddParam("data7", static_cast<int>(Data[7]) );
-	
-	return TDecodeResult::Success;
+		std::stringstream HostAddress;
+		HostAddress << (int)UData[10] << "." << (int)UData[11] << "." << (int)UData[12] << "." << (int)UData[13];
+
+		Job.mParams.mCommand = TJobParams::CommandReplyPrefix + TPokeyCommand::ToString( TPokeyCommand::Discover );
+		Job.mParams.AddParam("userid", static_cast<int>(UData[0]) );
+		Job.mParams.AddParam("version", Version.str() );
+		Job.mParams.AddParam("serial", Serial );
+		Job.mParams.AddParam("DhcpStatus", static_cast<int>(UData[9]) );
+		Job.mParams.AddParam("address", Address.str() );
+		Job.mParams.AddParam("hostaddress", HostAddress.str() );
+		return TDecodeResult::Success;
+	}
 }
 
 TDecodeResult::Type TProtocolPokey::DecodeData(TJob& Job,TChannelStream& Stream)
@@ -162,6 +224,12 @@ bool TProtocolPokey::Encode(const TJob& Job,Array<char>& Output)
 			data4 = 0;
 			data5 = 0;
 			break;
+			
+		//	special case where we send zero bytes
+		case TPokeyCommand::Discover:
+			Output.PushBack(0xff);
+			//Soy::Assert( Output.GetDataSize() == 0, "should send zero bytes for discovery");
+			return true;
 			
 		default:
 			return false;
@@ -254,6 +322,8 @@ TPopPokey::TPopPokey() :
 	AddJobHandler( TJobParams::CommandReplyPrefix + TPokeyCommand::ToString( TPokeyCommand::UnknownReply ), TParameterTraits(), *this, &TPopPokey::OnUnknownPokeyReply );
 	
 	mPollPokeyThread.reset( new TPollPokeyThread( static_cast<TChannelManager&>(*this) ) );
+	mDiscoverPokeyThread.reset( new TPokeyDiscoverThread( mDiscoverPokeyChannel ) );
+	
 }
 
 void TPopPokey::AddChannel(std::shared_ptr<TChannel> Channel)
@@ -341,9 +411,12 @@ TPopAppError::Type PopMain(TJobParams& Params)
 	
 	//	create stdio channel for commandline output
 	gStdioChannel = CreateChannelFromInputString("std:", SoyRef("stdio") );
+
 	
+	App.mDiscoverPokeyChannel.reset( new TChan<TChannelSocketUdpBroadcastClient,TProtocolPokey>( SoyRef("discover"), 20055 ) );
 	
 	App.AddChannel( CommandLineChannel );
+	App.AddChannel( App.mDiscoverPokeyChannel );
 	App.AddChannel( gStdioChannel );
 
 	
@@ -353,7 +426,7 @@ TPopAppError::Type PopMain(TJobParams& Params)
 	//	ConfigFilename = "bootup.txt";
 	
 	Array<std::string> Commands;
-	Commands.PushBack("initpokey hello 10.0.0.54:20055\n");
+	//Commands.PushBack("initpokey hello 10.0.0.54:20055\n");
 	//ParseConfig( ConfigFilename, GetArrayBridge( Commands ) );
 	for ( int i=0;	i<Commands.GetSize();	i++ )
 	{

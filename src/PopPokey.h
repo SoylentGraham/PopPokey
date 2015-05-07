@@ -12,9 +12,12 @@ namespace TPokeyCommand
 {
 	enum Type : unsigned char
 	{
+		//	not real codes for pokeys, but we need commands here
 		Invalid					= 0xff,
 		UnknownReply			= 0xfe,
-
+		Discover				= 0xfd,
+	
+		//	real codes
 		GetDeviceMeta			= 0x00,
 		GetUserId				= 0x03,
 	};
@@ -30,7 +33,7 @@ namespace TPokeyCommand
 class TProtocolPokey : public TProtocol
 {
 public:
-	std::atomic<unsigned char>	mRequestCounter;	//	gr: per device, but establish when this resets
+	static std::atomic<unsigned char>	mRequestCounter;	//	gr: per device, but establish when this resets
 	
 public:
 	TProtocolPokey()
@@ -116,6 +119,17 @@ private:
 };
 
 
+//	every N secs look for new pokeys
+class TPokeyDiscoverThread : public SoyWorkerThread
+{
+public:
+	TPokeyDiscoverThread(std::shared_ptr<TChannel>& Channel);
+	
+	virtual bool	Iteration() override;
+	virtual std::chrono::milliseconds	GetSleepDuration()	{	return std::chrono::milliseconds(1000);	}
+
+	std::shared_ptr<TChannel>&	mChannel;
+};
 
 class TPopPokey : public TJobHandler, public TChannelManager
 {
@@ -132,7 +146,10 @@ public:
 public:
 	Soy::Platform::TConsoleApp	mConsoleApp;
 
+	std::shared_ptr<TPokeyDiscoverThread>	mDiscoverPokeyThread;
 	std::shared_ptr<TPollPokeyThread>	mPollPokeyThread;
+	
+	std::shared_ptr<TChannel>	mDiscoverPokeyChannel;
 };
 
 

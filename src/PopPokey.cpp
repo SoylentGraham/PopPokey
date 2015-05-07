@@ -173,7 +173,8 @@ TDecodeResult::Type TProtocolPokey::DecodeHeader(TJob& Job,TChannelStream& Strea
 		
 		std::stringstream Address;
 		Address << (int)UData[5] << "." << (int)UData[6] << "." << (int)UData[7] << "." << (int)UData[8];
-
+		Address << ":20055";
+		
 		std::stringstream HostAddress;
 		HostAddress << (int)UData[10] << "." << (int)UData[11] << "." << (int)UData[12] << "." << (int)UData[13];
 
@@ -321,6 +322,8 @@ TPopPokey::TPopPokey() :
 
 	AddJobHandler( TJobParams::CommandReplyPrefix + TPokeyCommand::ToString( TPokeyCommand::UnknownReply ), TParameterTraits(), *this, &TPopPokey::OnUnknownPokeyReply );
 	
+	AddJobHandler( TJobParams::CommandReplyPrefix + TPokeyCommand::ToString( TPokeyCommand::Discover ), TParameterTraits(), *this, &TPopPokey::OnDiscoverPokey );
+	
 	mPollPokeyThread.reset( new TPollPokeyThread( static_cast<TChannelManager&>(*this) ) );
 	mDiscoverPokeyThread.reset( new TPokeyDiscoverThread( mDiscoverPokeyChannel ) );
 	
@@ -334,7 +337,52 @@ void TPopPokey::AddChannel(std::shared_ptr<TChannel> Channel)
 	TJobHandler::BindToChannel( *Channel );
 }
 
+TPokeyMeta TPopPokey::FindPokey(const TPokeyMeta &Pokey)
+{
+	for ( int i=0;	i<mPokeys.GetSize();	i++ )
+	{
+		auto& Match = mPokeys[i];
+		if ( Pokey.mSerial == Match.mSerial )
+			return Match;
+		if ( Pokey.mAddress == Match.mAddress )
+			return Match;
+	}
+	
+	return TPokeyMeta();
+}
 
+void TPopPokey::OnDiscoverPokey(TJobAndChannel& JobAndChannel)
+{
+	//	grab it's serial and see if it already exists
+	auto& Job = JobAndChannel.GetJob();
+	auto RefString = Job.mParams.GetParamAs<std::string>("serial");
+	SoyRef Ref( RefString.c_str() );
+	
+	TPokeyMeta Pokey;
+	Pokey.mAddress = Job.mParams.GetParamAs<std::string>("address");
+	Pokey.mSerial = Job.mParams.GetParamAs<int>("serial");
+	
+	//	find existing pokey
+	auto ExistingPokey = FindPokey( Pokey );
+	
+	//	same serial, different address, kill old one
+	//	different serial, same address, kill old one
+	//	same serial, same address, already exists
+	if ( ExistingPokey.mAddress == Pokey.mAddress && ExistingPokey.mSerial == Pokey.mSerial )
+	{
+		std::Debug << "Pokey #" << Pokey.mSerial << " @" << Pokey.mAddress << " already exists" << std::endl;
+		return;
+	}
+	
+	//	create a new pokey channel
+	Pokey.mChannelRef = Ref;
+	std::shared_ptr<TChannel> PokeyChannel( new TChan<TChannelSocketTcpClient,TProtocolPokey>( Pokey.mChannelRef, Pokey.mAddress ) );
+	AddChannel( PokeyChannel );
+	mPokeys.PushBack( Pokey );
+	mPollPokeyThread->AddPokeyChannel( PokeyChannel->GetChannelRef() );
+	
+	std::Debug << "Added new Pokey #" << Pokey.mSerial << " @" << Pokey.mAddress << " - " << PokeyChannel->GetDescription() << std::endl;
+}
 
 void TPopPokey::OnInitPokey(TJobAndChannel& JobAndChannel)
 {

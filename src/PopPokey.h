@@ -94,7 +94,19 @@ public:
 	
 */
 
-
+class TPokeyMeta
+{
+public:
+	TPokeyMeta() :
+		mSerial		( -1 )
+	{
+	}
+	
+public:
+	std::string		mAddress;
+	int				mSerial;
+	SoyRef			mChannelRef;
+};
 
 class TPollPokeyThread : public SoyWorkerThread
 {
@@ -139,9 +151,11 @@ public:
 	virtual void	AddChannel(std::shared_ptr<TChannel> Channel) override;
 
 	void			OnInitPokey(TJobAndChannel& JobAndChannel);
+	void			OnDiscoverPokey(TJobAndChannel& JobAndChannel);
 	void			OnPopGridEvent(TJobAndChannel& JobAndChannel);
 	void			OnUnknownPokeyReply(TJobAndChannel& JobAndChannel);
 	
+	TPokeyMeta		FindPokey(const TPokeyMeta& Pokey);
 	
 public:
 	Soy::Platform::TConsoleApp	mConsoleApp;
@@ -150,6 +164,8 @@ public:
 	std::shared_ptr<TPollPokeyThread>	mPollPokeyThread;
 	
 	std::shared_ptr<TChannel>	mDiscoverPokeyChannel;
+	
+	Array<TPokeyMeta>			mPokeys;
 };
 
 

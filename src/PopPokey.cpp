@@ -456,7 +456,7 @@ void TPopPokey::OnPokeyPollReply(TJobAndChannel& JobAndChannel)
 		return;
 	}
 	
-	std::Debug << "pins: " << Job.mParams.GetParamAs<std::string>("pins") << std::endl;
+	//std::Debug << "pins: " << Job.mParams.GetParamAs<std::string>("pins") << std::endl;
 	
 	UpdatePinState( Pokey.mSerial, GetArrayBridge(Pins) );
 }
@@ -562,13 +562,39 @@ void TPopPokey::UpdatePinState(int Serial,const ArrayBridge<char>& Pins)
 {
 	uint64 Pin64 = 0x0;
 	for ( int i=0;	i<Pins.GetSize();	i++ )
-		Pin64 |= Pins[i] << i;
+	{
+		uint64 PinDown = (Pins[i]!='0') ? 1 : 0;
+		Pin64 |= PinDown << i;
+	}
 	UpdatePinState( Serial, Pin64 );
 }
 
 void TPopPokey::UpdatePinState(int Serial,uint64 Pins)
 {
+	static uint64 StaticPins = 0;
+	StaticPins |= Pins;
 	//	update grid
+	
+	static int ResetCounter = 0;
+	static int ResetTimeout = 100;
+	if ( ResetCounter-- < 0 )
+	{
+		StaticPins = 0;
+		ResetCounter = ResetTimeout;
+	}
+	
+	//	reset
+	if ( Serial == 0 )
+		StaticPins = 0;
+	
+	std::Debug << "pins: ";
+	for( int i=0;	i<sizeof(StaticPins)*8;	i++ )
+	{
+		bool Set = (StaticPins & (1<<i)) != 0;
+		std::Debug << (Set?'1':'0');
+	}
+	
+	std::Debug << std::endl;
 }
 
 //	horrible global for lambda

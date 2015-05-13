@@ -61,6 +61,7 @@
 		FB8A07101A2E6B520099596C /* XmlTestReporter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FB8A06EB1A2E6B520099596C /* XmlTestReporter.cpp */; };
 		FB8A07131A2E6B880099596C /* TParameters.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FB8A07111A2E6B880099596C /* TParameters.cpp */; };
 		FB8A07171A2E6BBF0099596C /* sha1.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FB8A07151A2E6BBF0099596C /* sha1.cpp */; };
+		FB9820AA1B023A9100E794CF /* TProtocolPokey.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FB9820A81B023A9100E794CF /* TProtocolPokey.cpp */; };
 		FB9C89B21A8A62CE00931EFB /* OpenGL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FB9C89B11A8A62CE00931EFB /* OpenGL.framework */; };
 		FB9C89B61A8A63EE00931EFB /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FB9C89B51A8A63EE00931EFB /* Cocoa.framework */; };
 		FB9C89B81A8A63F700931EFB /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FB9C89B71A8A63F700931EFB /* IOKit.framework */; };
@@ -205,6 +206,8 @@
 		FB8A07121A2E6B880099596C /* TParameters.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = TParameters.h; path = ../PopTrack/src/TParameters.h; sourceTree = "<group>"; };
 		FB8A07151A2E6BBF0099596C /* sha1.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = sha1.cpp; path = ../ofxSoylent/src/smallsha1/sha1.cpp; sourceTree = "<group>"; };
 		FB8A07161A2E6BBF0099596C /* sha1.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = sha1.h; path = ../ofxSoylent/src/smallsha1/sha1.h; sourceTree = "<group>"; };
+		FB9820A81B023A9100E794CF /* TProtocolPokey.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = TProtocolPokey.cpp; path = src/TProtocolPokey.cpp; sourceTree = SOURCE_ROOT; };
+		FB9820A91B023A9100E794CF /* TProtocolPokey.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = TProtocolPokey.h; path = src/TProtocolPokey.h; sourceTree = SOURCE_ROOT; };
 		FB9C89981A82D2A700931EFB /* RemoteArray.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = RemoteArray.h; path = src/RemoteArray.h; sourceTree = "<group>"; };
 		FB9C89B11A8A62CE00931EFB /* OpenGL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenGL.framework; path = System/Library/Frameworks/OpenGL.framework; sourceTree = SDKROOT; };
 		FB9C89B51A8A63EE00931EFB /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
@@ -266,6 +269,8 @@
 		FB8A05951A2E54730099596C /* src */ = {
 			isa = PBXGroup;
 			children = (
+				FB9820A81B023A9100E794CF /* TProtocolPokey.cpp */,
+				FB9820A91B023A9100E794CF /* TProtocolPokey.h */,
 				FBA28D0E1AFA329E00CBF5D9 /* PopPokey.cpp */,
 				FBA28D0F1AFA329E00CBF5D9 /* PopPokey.h */,
 			);
@@ -278,16 +283,14 @@
 			children = (
 				FB50C04A1A6ABD480011A9D9 /* array.hpp */,
 				FB50C04B1A6ABD480011A9D9 /* bufferarray.hpp */,
-				FB9C89981A82D2A700931EFB /* RemoteArray.h */,
 				FB50C04C1A6ABD480011A9D9 /* HeapArray.hpp */,
 				FB50C04D1A6ABD480011A9D9 /* memheap.cpp */,
 				FB50C04E1A6ABD480011A9D9 /* MemHeap.hpp */,
+				FB9C89981A82D2A700931EFB /* RemoteArray.h */,
 				FB8A07141A2E6B990099596C /* sha1 */,
 				FB8A06231A2E5A7C0099596C /* SortArray.h */,
 				FB8A06241A2E5A7C0099596C /* SoyApp.cpp */,
 				FB8A06251A2E5A7C0099596C /* SoyApp.h */,
-				FB63E5181A71C3E9002C59BE /* SoyRingArray.cpp */,
-				FB63E5191A71C3E9002C59BE /* SoyRingArray.h */,
 				FB8A06261A2E5A7C0099596C /* SoyArray.cpp */,
 				FB8A06271A2E5A7C0099596C /* SoyDebug.cpp */,
 				FB8A06281A2E5A7C0099596C /* SoyDebug.h */,
@@ -305,6 +308,8 @@
 				FB8A063C1A2E5A7C0099596C /* SoyPng.h */,
 				FB8A063D1A2E5A7C0099596C /* SoyRef.cpp */,
 				FB8A063E1A2E5A7C0099596C /* SoyRef.h */,
+				FB63E5181A71C3E9002C59BE /* SoyRingArray.cpp */,
+				FB63E5191A71C3E9002C59BE /* SoyRingArray.h */,
 				FBC3A0DF1A308648009DA49E /* SoyScope.cpp */,
 				FBC3A0E01A308648009DA49E /* SoyScope.h */,
 				FB8A06431A2E5A7C0099596C /* SoyState.h */,
@@ -506,6 +511,7 @@
 				FB8A06F11A2E6B520099596C /* DeferredTestResult.cpp in Sources */,
 				FB8A07131A2E6B880099596C /* TParameters.cpp in Sources */,
 				FB8A06801A2E69340099596C /* PopMain.cpp in Sources */,
+				FB9820AA1B023A9100E794CF /* TProtocolPokey.cpp in Sources */,
 				FBC3A0E11A308648009DA49E /* SoyScope.cpp in Sources */,
 				FB8A06671A2E5A7C0099596C /* SoyTime.cpp in Sources */,
 				FB8A06ED1A2E6B520099596C /* AssertException.cpp in Sources */,

@@ -14,10 +14,21 @@
 #include <RemoteArray.h>
 
 
+const char* TPokeyMeta::CoordDelim = "/";
+const char* TPokeyMeta::CoordComponentDelim = ",";
+const vec2x<int> TPokeyMeta::GridCoordLaserGate = vec2x<int>(-99,-99);
+const vec2x<int> TPokeyMeta::GridCoordInvalid = vec2x<int>(-1,-1);
+
 
 std::ostream& operator<< (std::ostream &out,const TPokeyMeta &in)
 {
 	out << in.mSerial << "{" << in.mChannelRef << "@" << in.mAddress << ";" << in.GetGridMapString() << "}";
+	return out;
+}
+
+std::ostream& operator<< (std::ostream &out,const vec2x<int> &in)
+{
+	out << in.x << "," << in.y;
 	return out;
 }
 
@@ -27,7 +38,7 @@ bool TPokeyMeta::SetGridMap(const std::string& GridMapString,std::stringstream& 
 	mPinToGridMap.Clear();
 	
 	Array<std::string> IndexStrings;
-	Soy::StringSplitByString( GetArrayBridge(IndexStrings), GridMapString, "," );
+	Soy::StringSplitByString( GetArrayBridge(IndexStrings), GridMapString, CoordDelim );
 	
 	if ( IndexStrings.IsEmpty() && !GridMapString.empty() )
 	{
@@ -45,15 +56,31 @@ bool TPokeyMeta::SetGridMap(const std::string& GridMapString,std::stringstream& 
 		}
 		
 		auto& IndexString = IndexStrings[i];
-		int Index = -1;
 		
-		if ( !Soy::StringToType( Index, IndexString ) || Index < 0 )
+		//	special case
+		if ( IndexString == "lasergate" )
 		{
-			Error << "failed to turn " << IndexString << " into index";
+			mPinToGridMap.PushBack( TPokeyMeta::GridCoordLaserGate );
+			continue;
+		}
+		
+		vec2x<int> Coord(-1,-1);
+		BufferArray<std::string,2> Coords;
+		Soy::StringSplitByString( GetArrayBridge(Coords), IndexString, CoordComponentDelim );
+		if ( Coords.GetSize() != 2 )
+		{
+			Error << "coord " << IndexString << " not valid";
 			return false;
 		}
 		
-		mPinToGridMap.PushBack( Index );
+		//	convert
+		if ( !Soy::StringToType( Coord.x, Coords[0] ) || !Soy::StringToType( Coord.y, Coords[1] ) )
+		{
+			Error << "failed to turn (" << Coords[0] << ") and (" << Coords[1] << ") into coords";
+			return false;
+		}
+		
+		mPinToGridMap.PushBack( Coord );
 	}
 	
 	return true;
@@ -144,7 +171,8 @@ void TPollPokeyThread::SendJob(TJob& Job)
 
 
 TPopPokey::TPopPokey() :
-	TJobHandler	( static_cast<TChannelManager&>(*this) )
+	TJobHandler		( static_cast<TChannelManager&>(*this) ),
+	mLastGridCoord	( TPokeyMeta::GridCoordInvalid )
 {
 	TParameterTraits InitPokeyTraits;
 	InitPokeyTraits.mAssumedKeys.PushBack("ref");
@@ -158,13 +186,15 @@ TPopPokey::TPopPokey() :
 	SetupPokeyTraits.mRequiredKeys.PushBack("serial");
 	AddJobHandler("SetupPokey", SetupPokeyTraits, *this, &TPopPokey::OnSetupPokey );
 	
-	TParameterTraits PopGridPinTraits;
-	AddJobHandler("PopGridPin", PopGridPinTraits, *this, &TPopPokey::OnPopGridPin );
+	TParameterTraits PopGridCoordTraits;
+	AddJobHandler("PopGridCoord", PopGridCoordTraits, *this, &TPopPokey::OnPopGridCoord );
 	
-	TParameterTraits PushGridPinTraits;
-	PushGridPinTraits.mAssumedKeys.PushBack("pin");
-	PushGridPinTraits.mRequiredKeys.PushBack("pin");
-	AddJobHandler("PushGridPin", PushGridPinTraits, *this, &TPopPokey::OnPushGridPin );
+	TParameterTraits PushGridCoordTraits;
+	PushGridCoordTraits.mAssumedKeys.PushBack("pinx");
+	PushGridCoordTraits.mRequiredKeys.PushBack("pinx");
+	PushGridCoordTraits.mAssumedKeys.PushBack("piny");
+	PushGridCoordTraits.mRequiredKeys.PushBack("piny");
+	AddJobHandler("PushGridCoord", PushGridCoordTraits, *this, &TPopPokey::OnPushGridCoord );
 	
 	AddJobHandler( TJobParams::CommandReplyPrefix + TPokeyCommand::ToString( TPokeyCommand::UnknownReply ), TParameterTraits(), *this, &TPopPokey::OnUnknownPokeyReply );
 	
@@ -381,45 +411,55 @@ void TPopPokey::OnSetupPokey(TJobAndChannel& JobAndChannel)
 	Pokey->SetGridMap( GridMap, Error );
 
 	TJobReply Reply( JobAndChannel );
+	
+	if ( !Error.str().empty() )
+		Reply.mParams.AddErrorParam( Error.str() );
+
 	std::stringstream Debug;
 	Debug << "Updated pokey " << (*Pokey) << " with gridmap: " << Pokey->GetGridMapString();
 	std::Debug << Debug.str() << std::endl;
 	Reply.mParams.AddDefaultParam( Debug.str() );
+
 	
 	TChannel& Channel = JobAndChannel;
 	Channel.OnJobCompleted( Reply );
 }
 
 
-void TPopPokey::OnPushGridPin(TJobAndChannel& JobAndChannel)
+void TPopPokey::OnPushGridCoord(TJobAndChannel& JobAndChannel)
 {
 	auto& Job = JobAndChannel.GetJob();
 	
-	auto GridPin = Job.mParams.GetParamAsWithDefault<int>("pin", -1);
-	PushGridPin( GridPin );
+	vec2x<int> GridCoord;
+	GridCoord.x = Job.mParams.GetParamAsWithDefault<int>("pinx", -1);
+	GridCoord.y = Job.mParams.GetParamAsWithDefault<int>("piny", -1);
+	PushGridCoord( GridCoord );
 	
 	TJobReply Reply( JobAndChannel );
 	std::stringstream Debug;
-	Debug << "Set pin to " << GridPin;
+	Debug << "Set grid coord to " << GridCoord;
 	Reply.mParams.AddDefaultParam( Debug.str() );
 	
 	TChannel& Channel = JobAndChannel;
 	Channel.OnJobCompleted( Reply );
 }
 
-void TPopPokey::OnPopGridPin(TJobAndChannel& JobAndChannel)
+void TPopPokey::OnPopGridCoord(TJobAndChannel& JobAndChannel)
 {
 	auto& Job = JobAndChannel.GetJob();
 	
-	mLastGridPinLock.lock();
-	int LastGridPin = mLastGridPin;
-	mLastGridPin = -1;
-	mLastGridPinLock.unlock();
+	mLastGridCoordLock.lock();
+	auto LastGridCoord = mLastGridCoord;
+	mLastGridCoord = TPokeyMeta::GridCoordInvalid;
+	mLastGridCoordLock.unlock();
 	
 	TJobReply Reply( JobAndChannel );
-	std::stringstream Debug;
-	Debug << LastGridPin;
-	Reply.mParams.AddDefaultParam( Debug.str() );
+	std::stringstream ReplyString;
+	if ( LastGridCoord == TPokeyMeta::GridCoordLaserGate )
+		ReplyString << "lasergate";
+	else
+		ReplyString << LastGridCoord;
+	Reply.mParams.AddDefaultParam( ReplyString.str() );
 	
 	TChannel& Channel = JobAndChannel;
 	Channel.OnJobCompleted( Reply );
@@ -451,18 +491,18 @@ void TPopPokey::UpdatePinState(TPokeyMeta& Pokey,const ArrayBridge<char>& Pins)
 			continue;
 		}
 
-		PushGridPin( Pokey.mPinToGridMap[i] );
+		PushGridCoord( Pokey.mPinToGridMap[i] );
 	}
 }
 
 
-void TPopPokey::PushGridPin(int GridPin)
+void TPopPokey::PushGridCoord(vec2x<int> GridCoord)
 {
-	mLastGridPinLock.lock();
-	mLastGridPin = GridPin;
-	mLastGridPinLock.unlock();
+	mLastGridCoordLock.lock();
+	mLastGridCoord = GridCoord;
+	mLastGridCoordLock.unlock();
 	
-	std::Debug << "pin set to " << GridPin << std::endl;
+	std::Debug << "pin set to " << GridCoord << std::endl;
 }
 
 
@@ -486,11 +526,31 @@ TPopAppError::Type PopMain(TJobParams& Params)
 
 	
 	App.mDiscoverPokeyChannel.reset( new TChan<TChannelSocketUdpBroadcastClient,TProtocolPokey>( SoyRef("discover"), 20055 ) );
+
+	auto HttpChannel = CreateChannelFromInputString("http:8080",SoyRef("http"));
+
 	
 	App.AddChannel( CommandLineChannel );
 	App.AddChannel( App.mDiscoverPokeyChannel );
 	App.AddChannel( gStdioChannel );
+	App.AddChannel( HttpChannel );
 
+	
+	//	when the commandline SENDs a command (a reply), send it to stdout
+	auto RelayFunc = [](TJobAndChannel& JobAndChannel)
+	{
+		if ( !gStdioChannel )
+			return;
+		TJob Job = JobAndChannel;
+		Job.mChannelMeta.mChannelRef = gStdioChannel->GetChannelRef();
+		Job.mChannelMeta.mClientRef = SoyRef();
+		gStdioChannel->SendCommand( Job );
+	};
+	CommandLineChannel->mOnJobSent.AddListener( RelayFunc );
+	CommandLineChannel->mOnJobRecieved.AddListener( RelayFunc );
+
+	
+	
 	
 	//	bootup commands
 	std::string ConfigFilename = Params.GetParamAs<std::string>("config");
@@ -506,11 +566,9 @@ TPopAppError::Type PopMain(TJobParams& Params)
 		std::Debug << "config file " << ConfigFilename << " error: " << ConfigFileError.str() << std::endl;
 
 	//	hard coded init commands
-	Commands.PushBack("setuppokey serial=21244 gridmap=100,101,102,103,104,105,106,107,108");
-	Commands.PushBack("setuppokey serial=22961 gridmap=1,2,3,4,5,6,7,8,9,10");
-
-	
-	//Commands.PushBack("initpokey hello 10.0.0.54:20055\n");
+	Commands.PushBack("setuppokey serial=21244 gridmap=0,0/1,0/2,0");
+	Commands.PushBack("setuppokey serial=22961 gridmap=0,1/1,1/2,1");
+	Commands.PushBack("setuppokey serial=22962 gridmap=lasergate");
 
 	for ( int i=0;	i<Commands.GetSize();	i++ )
 	{
@@ -523,21 +581,11 @@ TPopAppError::Type PopMain(TJobParams& Params)
 			continue;
 		}
 		CommandLineChannel->Execute( Job.mParams.mCommand, Job.mParams );
+		CommandLineChannel->mOnJobRecieved.AddListener( RelayFunc );
 	}
 
 	
 	
-	//	when the commandline SENDs a command (a reply), send it to stdout
-	auto RelayFunc = [](TJobAndChannel& JobAndChannel)
-	{
-		if ( !gStdioChannel )
-			return;
-		TJob Job = JobAndChannel;
-		Job.mChannelMeta.mChannelRef = gStdioChannel->GetChannelRef();
-		Job.mChannelMeta.mClientRef = SoyRef();
-		gStdioChannel->SendCommand( Job );
-	};
-	CommandLineChannel->mOnJobSent.AddListener( RelayFunc );
 	
 	
 	

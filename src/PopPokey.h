@@ -52,6 +52,12 @@ public:
 class TPokeyMeta
 {
 public:
+	static const char* CoordDelim;
+	static const char* CoordComponentDelim;
+	static const vec2x<int> GridCoordLaserGate;
+	static const vec2x<int> GridCoordInvalid;
+	
+public:
 	TPokeyMeta() :
 		mSerial			( -1 )
 	{
@@ -61,11 +67,11 @@ public:
 	bool			SetGridMap(const std::string& GridMapString,std::stringstream& Error);
 	std::string		GetGridMapString() const
 	{
-		return Soy::StringJoin( GetArrayBridge(mPinToGridMap), "," );
+		return Soy::StringJoin( GetArrayBridge(mPinToGridMap), CoordDelim );
 	}
 
 public:
-	BufferArray<int,55>	mPinToGridMap;
+	BufferArray<vec2x<int>,55>	mPinToGridMap;
 	std::string			mAddress;
 	int					mSerial;
 	SoyRef				mChannelRef;
@@ -119,8 +125,8 @@ public:
 	void			OnInitPokey(TJobAndChannel& JobAndChannel);
 	void			OnSetupPokey(TJobAndChannel& JobAndChannel);
 	void			OnDiscoverPokey(TJobAndChannel& JobAndChannel);
-	void			OnPopGridPin(TJobAndChannel& JobAndChannel);
-	void			OnPushGridPin(TJobAndChannel& JobAndChannel);
+	void			OnPopGridCoord(TJobAndChannel& JobAndChannel);
+	void			OnPushGridCoord(TJobAndChannel& JobAndChannel);
 	void			OnUnknownPokeyReply(TJobAndChannel& JobAndChannel);
 	void			OnPokeyPollReply(TJobAndChannel& JobAndChannel);
 	
@@ -130,7 +136,7 @@ public:
 
 	void			UpdatePinState(TPokeyMeta& Pokey,const ArrayBridge<char>& Pins);
 	void			UpdatePinState(TPokeyMeta& Pokey,uint64 Pins);
-	void			PushGridPin(int GridPin);
+	void			PushGridCoord(vec2x<int> GridCoord);
 	
 public:
 	Soy::Platform::TConsoleApp	mConsoleApp;
@@ -143,8 +149,8 @@ public:
 	std::mutex					mPokeysLock;	//	for when resizing array
 	Array<std::shared_ptr<TPokeyMeta>>			mPokeys;
 	
-	std::mutex					mLastGridPinLock;
-	int							mLastGridPin;
+	std::mutex					mLastGridCoordLock;
+	vec2x<int>					mLastGridCoord;
 };
 
 

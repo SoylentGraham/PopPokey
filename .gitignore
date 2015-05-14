@@ -1,3 +1,11 @@
+# visual studio temp dir
+[dD]ebug/
+*.visualstudio/.vs/
+*.visualstudio/ipch/
+*.visualstudio/bin/
+*.sdf
+*.opensdf
+
 # osx
 .DS_Store
 

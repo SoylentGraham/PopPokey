@@ -1,0 +1,179 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\ofxSoylent\src\memheap.cpp" />
+    <ClCompile Include="..\..\ofxSoylent\src\smallsha1\sha1.cpp" />
+    <ClCompile Include="..\..\ofxSoylent\src\SoyApp.cpp" />
+    <ClCompile Include="..\..\ofxSoylent\src\SoyArray.cpp" />
+    <ClCompile Include="..\..\ofxSoylent\src\SoyDebug.cpp" />
+    <ClCompile Include="..\..\ofxSoylent\src\SoyEvent.cpp" />
+    <ClCompile Include="..\..\ofxSoylent\src\SoyMemFile.cpp" />
+    <ClCompile Include="..\..\ofxSoylent\src\SoyPixels.cpp" />
+    <ClCompile Include="..\..\ofxSoylent\src\SoyPng.cpp" />
+    <ClCompile Include="..\..\ofxSoylent\src\SoyRef.cpp" />
+    <ClCompile Include="..\..\ofxSoylent\src\SoyRingArray.cpp" />
+    <ClCompile Include="..\..\ofxSoylent\src\SoyScope.cpp" />
+    <ClCompile Include="..\..\ofxSoylent\src\SoyString.cpp" />
+    <ClCompile Include="..\..\ofxSoylent\src\SoyTest.cpp" />
+    <ClCompile Include="..\..\ofxSoylent\src\SoyThread.cpp" />
+    <ClCompile Include="..\..\ofxSoylent\src\SoyTime.cpp" />
+    <ClCompile Include="..\..\ofxSoylent\src\SoyTypes.cpp" />
+    <ClCompile Include="..\..\PopTrack\src\PopMain.cpp" />
+    <ClCompile Include="..\..\PopTrack\src\SoyData.cpp" />
+    <ClCompile Include="..\..\PopTrack\src\TChannel.cpp" />
+    <ClCompile Include="..\..\PopTrack\src\TChannelFile.cpp" />
+    <ClCompile Include="..\..\PopTrack\src\TChannelFork.cpp" />
+    <ClCompile Include="..\..\PopTrack\src\TChannelLiteral.cpp" />
+    <ClCompile Include="..\..\PopTrack\src\TChannelPipe.cpp" />
+    <ClCompile Include="..\..\PopTrack\src\TChannelSocket.cpp" />
+    <ClCompile Include="..\..\PopTrack\src\TJob.cpp" />
+    <ClCompile Include="..\..\PopTrack\src\TJobEventSubscriber.cpp" />
+    <ClCompile Include="..\..\PopTrack\src\TJobFormat.cpp" />
+    <ClCompile Include="..\..\PopTrack\src\TJobRelay.cpp" />
+    <ClCompile Include="..\..\PopTrack\src\TParameters.cpp" />
+    <ClCompile Include="..\..\PopTrack\src\TProtocol.cpp" />
+    <ClCompile Include="..\..\PopTrack\src\TProtocolCli.cpp" />
+    <ClCompile Include="..\..\PopTrack\src\TProtocolHttp.cpp" />
+    <ClCompile Include="..\..\PopTrack\src\TProtocolJson.cpp" />
+    <ClCompile Include="..\..\PopTrack\src\TProtocolWebSocket.cpp" />
+    <ClCompile Include="..\..\PopTrack\src\TSerialisation.cpp" />
+    <ClCompile Include="..\..\PopTrack\src\UnitTest++\src\AssertException.cpp" />
+    <ClCompile Include="..\..\PopTrack\src\UnitTest++\src\Checks.cpp" />
+    <ClCompile Include="..\..\PopTrack\src\UnitTest++\src\CurrentTest.cpp" />
+    <ClCompile Include="..\..\PopTrack\src\UnitTest++\src\DeferredTestReporter.cpp" />
+    <ClCompile Include="..\..\PopTrack\src\UnitTest++\src\DeferredTestResult.cpp" />
+    <ClCompile Include="..\..\PopTrack\src\UnitTest++\src\MemoryOutStream.cpp" />
+    <ClCompile Include="..\..\PopTrack\src\UnitTest++\src\ReportAssert.cpp" />
+    <ClCompile Include="..\..\PopTrack\src\UnitTest++\src\Test.cpp" />
+    <ClCompile Include="..\..\PopTrack\src\UnitTest++\src\TestDetails.cpp" />
+    <ClCompile Include="..\..\PopTrack\src\UnitTest++\src\TestList.cpp" />
+    <ClCompile Include="..\..\PopTrack\src\UnitTest++\src\TestReporter.cpp" />
+    <ClCompile Include="..\..\PopTrack\src\UnitTest++\src\TestReporterStdout.cpp" />
+    <ClCompile Include="..\..\PopTrack\src\UnitTest++\src\TestResults.cpp" />
+    <ClCompile Include="..\..\PopTrack\src\UnitTest++\src\TestRunner.cpp" />
+    <ClCompile Include="..\..\PopTrack\src\UnitTest++\src\TimeConstraint.cpp" />
+    <ClCompile Include="..\..\PopTrack\src\UnitTest++\src\Win32\TimeHelpers.cpp" />
+    <ClCompile Include="..\..\PopTrack\src\UnitTest++\src\XmlTestReporter.cpp" />
+    <ClCompile Include="..\src\PopPokey.cpp" />
+    <ClCompile Include="..\src\TProtocolPokey.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\ofxSoylent\src\array.hpp" />
+    <ClInclude Include="..\..\ofxSoylent\src\bufferarray.hpp" />
+    <ClInclude Include="..\..\ofxSoylent\src\heaparray.hpp" />
+    <ClInclude Include="..\..\ofxSoylent\src\memheap.hpp" />
+    <ClInclude Include="..\..\ofxSoylent\src\RemoteArray.h" />
+    <ClInclude Include="..\..\ofxSoylent\src\smallsha1\sha1.h" />
+    <ClInclude Include="..\..\ofxSoylent\src\SortArray.h" />
+    <ClInclude Include="..\..\ofxSoylent\src\SoyApp.h" />
+    <ClInclude Include="..\..\ofxSoylent\src\SoyArray.h" />
+    <ClInclude Include="..\..\ofxSoylent\src\SoyDebug.h" />
+    <ClInclude Include="..\..\ofxSoylent\src\SoyEvent.h" />
+    <ClInclude Include="..\..\ofxSoylent\src\SoyMemFile.h" />
+    <ClInclude Include="..\..\ofxSoylent\src\SoyPixels.h" />
+    <ClInclude Include="..\..\ofxSoylent\src\SoyPng.h" />
+    <ClInclude Include="..\..\ofxSoylent\src\SoyRef.h" />
+    <ClInclude Include="..\..\ofxSoylent\src\SoyRingArray.h" />
+    <ClInclude Include="..\..\ofxSoylent\src\SoyScope.h" />
+    <ClInclude Include="..\..\ofxSoylent\src\SoyString.h" />
+    <ClInclude Include="..\..\ofxSoylent\src\SoyThread.h" />
+    <ClInclude Include="..\..\ofxSoylent\src\SoyTime.h" />
+    <ClInclude Include="..\..\ofxSoylent\src\SoyTypes.h" />
+    <ClInclude Include="..\..\PopTrack\src\popmain.h" />
+    <ClInclude Include="..\..\PopTrack\src\SoyData.h" />
+    <ClInclude Include="..\..\PopTrack\src\TChannel.h" />
+    <ClInclude Include="..\..\PopTrack\src\TChannelFile.h" />
+    <ClInclude Include="..\..\PopTrack\src\TChannelFork.h" />
+    <ClInclude Include="..\..\PopTrack\src\TChannelLiteral.h" />
+    <ClInclude Include="..\..\PopTrack\src\TChannelPipe.h" />
+    <ClInclude Include="..\..\PopTrack\src\TChannelSocket.h" />
+    <ClInclude Include="..\..\PopTrack\src\TJob.h" />
+    <ClInclude Include="..\..\PopTrack\src\TJobEventSubscriber.h" />
+    <ClInclude Include="..\..\PopTrack\src\TJobFormat.h" />
+    <ClInclude Include="..\..\PopTrack\src\TJobRelay.h" />
+    <ClInclude Include="..\..\PopTrack\src\TParameters.h" />
+    <ClInclude Include="..\..\PopTrack\src\TProtocol.h" />
+    <ClInclude Include="..\..\PopTrack\src\TProtocolCli.h" />
+    <ClInclude Include="..\..\PopTrack\src\TProtocolHttp.h" />
+    <ClInclude Include="..\..\PopTrack\src\TProtocolJson.h" />
+    <ClInclude Include="..\..\PopTrack\src\TProtocolWebSocket.h" />
+    <ClInclude Include="..\..\PopTrack\src\TSerialisation.h" />
+    <ClInclude Include="..\..\PopTrack\src\UnitTest++\src\AssertException.h" />
+    <ClInclude Include="..\..\PopTrack\src\UnitTest++\src\CheckMacros.h" />
+    <ClInclude Include="..\..\PopTrack\src\UnitTest++\src\Checks.h" />
+    <ClInclude Include="..\..\PopTrack\src\UnitTest++\src\Config.h" />
+    <ClInclude Include="..\..\PopTrack\src\UnitTest++\src\CurrentTest.h" />
+    <ClInclude Include="..\..\PopTrack\src\UnitTest++\src\DeferredTestReporter.h" />
+    <ClInclude Include="..\..\PopTrack\src\UnitTest++\src\DeferredTestResult.h" />
+    <ClInclude Include="..\..\PopTrack\src\UnitTest++\src\ExecuteTest.h" />
+    <ClInclude Include="..\..\PopTrack\src\UnitTest++\src\MemoryOutStream.h" />
+    <ClInclude Include="..\..\PopTrack\src\UnitTest++\src\ReportAssert.h" />
+    <ClInclude Include="..\..\PopTrack\src\UnitTest++\src\Test.h" />
+    <ClInclude Include="..\..\PopTrack\src\UnitTest++\src\TestDetails.h" />
+    <ClInclude Include="..\..\PopTrack\src\UnitTest++\src\TestList.h" />
+    <ClInclude Include="..\..\PopTrack\src\UnitTest++\src\TestMacros.h" />
+    <ClInclude Include="..\..\PopTrack\src\UnitTest++\src\TestReporter.h" />
+    <ClInclude Include="..\..\PopTrack\src\UnitTest++\src\TestReporterStdout.h" />
+    <ClInclude Include="..\..\PopTrack\src\UnitTest++\src\TestResults.h" />
+    <ClInclude Include="..\..\PopTrack\src\UnitTest++\src\TestRunner.h" />
+    <ClInclude Include="..\..\PopTrack\src\UnitTest++\src\TestSuite.h" />
+    <ClInclude Include="..\..\PopTrack\src\UnitTest++\src\TimeConstraint.h" />
+    <ClInclude Include="..\..\PopTrack\src\UnitTest++\src\TimeHelpers.h" />
+    <ClInclude Include="..\..\PopTrack\src\UnitTest++\src\UnitTest++.h" />
+    <ClInclude Include="..\..\PopTrack\src\UnitTest++\src\Win32\TimeHelpers.h" />
+    <ClInclude Include="..\..\PopTrack\src\UnitTest++\src\XmlTestReporter.h" />
+    <ClInclude Include="..\src\PopPokey.h" />
+    <ClInclude Include="..\src\TProtocolPokey.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\PopTrack\src\SoyData.inl" />
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{64811728-CD20-4F2C-899B-E3BF3D4B032E}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>PopPokey</RootNamespace>
+    <TargetPlatformVersion>8.1</TargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v140</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="..\..\PopTrack\PopConfig.props" />
+    <Import Project="..\..\PopTrack\PopApp.props" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

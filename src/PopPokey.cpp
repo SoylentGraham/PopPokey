@@ -561,14 +561,16 @@ TPopAppError::Type PopMain(TJobParams& Params)
 
 	//	parse command file
 	std::stringstream ConfigFileError;
-	Soy::FileToStringLines( ConfigFilename, GetArrayBridge(Commands), ConfigFileError );
+	if (!Soy::FileToStringLines(ConfigFilename, GetArrayBridge(Commands), ConfigFileError))
+	{
+		std::Debug << "failed to load " << ConfigFilename << "... using debug init commands" << std::endl;
+		Commands.PushBack("setuppokey serial=21244 gridmap=0,0/1,0/2,0");
+		Commands.PushBack("setuppokey serial=22961 gridmap=0,1/1,1/2,1");
+		Commands.PushBack("setuppokey serial=22962 gridmap=lasergate");
+	}
+
 	if ( !ConfigFileError.str().empty() )
 		std::Debug << "config file " << ConfigFilename << " error: " << ConfigFileError.str() << std::endl;
-
-	//	hard coded init commands
-	Commands.PushBack("setuppokey serial=21244 gridmap=0,0/1,0/2,0");
-	Commands.PushBack("setuppokey serial=22961 gridmap=0,1/1,1/2,1");
-	Commands.PushBack("setuppokey serial=22962 gridmap=lasergate");
 
 	for ( int i=0;	i<Commands.GetSize();	i++ )
 	{

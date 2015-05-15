@@ -70,11 +70,16 @@ void TypeToHex(const TYPE Value,std::ostream& String)
 bool TProtocolPokey::DecodeReply(TJob& Job,const BufferArray<unsigned char,64>& Data)
 {
 	//	first 8 bytes are a header
-	auto RequestId = Data[0];
-	auto Cmd = static_cast<TPokeyCommand::Type>(Data[1]);
-	
-	if ( !TPokeyCommand::IsValid(Cmd) )
-		Cmd = TPokeyCommand::Invalid;
+	auto RequestId = Data[6];
+	auto Cmdi = Data[1];
+	auto Cmd = TPokeyCommand::Validate( static_cast<TPokeyCommand::Type>(Cmdi) );
+
+	//	check the checksum
+	auto Checksum = TPokeyCommand::CalculateChecksum( Data.GetArray() );
+	if ( Checksum != Data[7] )
+	{
+		std::Debug << "Pokey checksum failed on request " << RequestId << " command: " << Cmdi << "(" << TPokeyCommand::ToString(Cmd) << ")" << std::endl;
+	}
 	
 	Job.mParams.mCommand = TJobParams::CommandReplyPrefix + TPokeyCommand::ToString( Cmd );
 	Job.mParams.AddParam("requestid", static_cast<int>(RequestId) );

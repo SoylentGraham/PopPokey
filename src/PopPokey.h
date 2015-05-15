@@ -56,6 +56,8 @@ public:
 	static const char* CoordComponentDelim;
 	static const vec2x<int> GridCoordLaserGate;
 	static const vec2x<int> GridCoordInvalid;
+	static const char* LaserGateOnReply;
+	static const char* LaserGateOffReply;
 	
 public:
 	TPokeyMeta() :
@@ -127,6 +129,8 @@ public:
 	void			OnDiscoverPokey(TJobAndChannel& JobAndChannel);
 	void			OnPopGridCoord(TJobAndChannel& JobAndChannel);
 	void			OnPushGridCoord(TJobAndChannel& JobAndChannel);
+	void			OnPopLaserGateState(TJobAndChannel& JobAndChannel);
+	void			OnPushLaserGateState(TJobAndChannel& JobAndChannel);
 	void			OnUnknownPokeyReply(TJobAndChannel& JobAndChannel);
 	void			OnPokeyPollReply(TJobAndChannel& JobAndChannel);
 	
@@ -137,6 +141,7 @@ public:
 	void			UpdatePinState(TPokeyMeta& Pokey,const ArrayBridge<char>& Pins);
 	void			UpdatePinState(TPokeyMeta& Pokey,uint64 Pins);
 	void			PushGridCoord(vec2x<int> GridCoord);
+	void			PushLaserGateState(bool State);
 	
 public:
 	Soy::Platform::TConsoleApp	mConsoleApp;
@@ -151,6 +156,7 @@ public:
 	
 	std::mutex					mLastGridCoordLock;
 	vec2x<int>					mLastGridCoord;
+	bool						mLaserGateState;
 };
 
 

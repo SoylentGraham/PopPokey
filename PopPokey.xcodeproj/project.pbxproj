@@ -96,6 +96,7 @@
 		FB63E5181A71C3E9002C59BE /* SoyRingArray.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = SoyRingArray.cpp; path = src/SoyRingArray.cpp; sourceTree = "<group>"; };
 		FB63E5191A71C3E9002C59BE /* SoyRingArray.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SoyRingArray.h; path = src/SoyRingArray.h; sourceTree = "<group>"; };
 		FB6650CC1A56FD8600DF0A12 /* SoyDebug.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = SoyDebug.mm; path = src/SoyDebug.mm; sourceTree = "<group>"; };
+		FB82459A1B05526C00A7FB11 /* string.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; name = string.hpp; path = src/string.hpp; sourceTree = "<group>"; };
 		FB8A05931A2E54730099596C /* PopPokey */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = PopPokey; sourceTree = BUILT_PRODUCTS_DIR; };
 		FB8A05A61A2E57700099596C /* PopApp.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = PopApp.xcconfig; path = ../NewChromantics/PopTrack/PopApp.xcconfig; sourceTree = SOURCE_ROOT; };
 		FB8A06231A2E5A7C0099596C /* SortArray.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SortArray.h; path = ../ofxSoylent/src/SortArray.h; sourceTree = "<group>"; };
@@ -294,6 +295,7 @@
 				FB8A06261A2E5A7C0099596C /* SoyArray.cpp */,
 				FB8A06271A2E5A7C0099596C /* SoyDebug.cpp */,
 				FB8A06281A2E5A7C0099596C /* SoyDebug.h */,
+				FB82459A1B05526C00A7FB11 /* string.hpp */,
 				FB6650CC1A56FD8600DF0A12 /* SoyDebug.mm */,
 				FB8A06291A2E5A7C0099596C /* SoyEnum.h */,
 				FB8A062A1A2E5A7C0099596C /* SoyEvent.cpp */,

@@ -18,6 +18,8 @@ const char* TPokeyMeta::CoordDelim = "/";
 const char* TPokeyMeta::CoordComponentDelim = ",";
 const vec2x<int> TPokeyMeta::GridCoordLaserGate = vec2x<int>(-99,-99);
 const vec2x<int> TPokeyMeta::GridCoordInvalid = vec2x<int>(-1,-1);
+const char* TPokeyMeta::LaserGateOnReply = "lasergate_on";
+const char* TPokeyMeta::LaserGateOffReply = "lasergate_off";
 
 
 std::ostream& operator<< (std::ostream &out,const TPokeyMeta &in)
@@ -195,6 +197,14 @@ TPopPokey::TPopPokey() :
 	PushGridCoordTraits.mAssumedKeys.PushBack("piny");
 	PushGridCoordTraits.mRequiredKeys.PushBack("piny");
 	AddJobHandler("PushGridCoord", PushGridCoordTraits, *this, &TPopPokey::OnPushGridCoord );
+	
+	TParameterTraits PopLaserGateStateTraits;
+	AddJobHandler("PopLaserGate", PopLaserGateStateTraits, *this, &TPopPokey::OnPopLaserGateState );
+	
+	TParameterTraits PushLaserGateStateTraits;
+	PushLaserGateStateTraits.mAssumedKeys.PushBack("state");
+	PushLaserGateStateTraits.mRequiredKeys.PushBack("state");
+	AddJobHandler("PushLaserGate", PushLaserGateStateTraits, *this, &TPopPokey::OnPushLaserGateState );
 	
 	AddJobHandler( TJobParams::CommandReplyPrefix + TPokeyCommand::ToString( TPokeyCommand::UnknownReply ), TParameterTraits(), *this, &TPopPokey::OnUnknownPokeyReply );
 	
@@ -465,6 +475,45 @@ void TPopPokey::OnPopGridCoord(TJobAndChannel& JobAndChannel)
 	Channel.OnJobCompleted( Reply );
 }
 
+void TPopPokey::OnPushLaserGateState(TJobAndChannel& JobAndChannel)
+{
+	auto& Job = JobAndChannel.GetJob();
+	
+	bool State = false;
+	State = Job.mParams.GetParamAsWithDefault<int>("state", 0);
+	PushLaserGateState( State );
+	
+	TJobReply Reply( JobAndChannel );
+	std::stringstream Debug;
+	Debug << "Set laser gate state to " << State;
+	Reply.mParams.AddDefaultParam( Debug.str() );
+	
+	TChannel& Channel = JobAndChannel;
+	Channel.OnJobCompleted( Reply );
+}
+
+void TPopPokey::OnPopLaserGateState(TJobAndChannel& JobAndChannel)
+{
+	auto& Job = JobAndChannel.GetJob();
+	
+	mLastGridCoordLock.lock();
+	auto LastState = mLaserGateState;
+	mLaserGateState = false;
+	mLastGridCoordLock.unlock();
+	
+	TJobReply Reply( JobAndChannel );
+	std::stringstream ReplyString;
+	if ( LastState )
+		ReplyString << "lasergate_on";
+	else
+		ReplyString << "lasergate_off";
+	Reply.mParams.AddDefaultParam( ReplyString.str() );
+	
+	TChannel& Channel = JobAndChannel;
+	Channel.OnJobCompleted( Reply );
+}
+
+
 
 void TPopPokey::OnUnknownPokeyReply(TJobAndChannel& JobAndChannel)
 {
@@ -498,11 +547,28 @@ void TPopPokey::UpdatePinState(TPokeyMeta& Pokey,const ArrayBridge<char>& Pins)
 
 void TPopPokey::PushGridCoord(vec2x<int> GridCoord)
 {
+	//	if laser gate, set the state
+	if ( GridCoord == TPokeyMeta::GridCoordLaserGate )
+	{
+		PushLaserGateState(true);
+		return;
+	}
+	
 	mLastGridCoordLock.lock();
 	mLastGridCoord = GridCoord;
 	mLastGridCoordLock.unlock();
 	
 	std::Debug << "pin set to " << GridCoord << std::endl;
+}
+
+
+void TPopPokey::PushLaserGateState(bool State)
+{
+	mLastGridCoordLock.lock();
+	mLaserGateState = State;
+	mLastGridCoordLock.unlock();
+	
+	std::Debug << "laser gate set to " << State << std::endl;
 }
 
 
@@ -561,14 +627,16 @@ TPopAppError::Type PopMain(TJobParams& Params)
 
 	//	parse command file
 	std::stringstream ConfigFileError;
-	Soy::FileToStringLines( ConfigFilename, GetArrayBridge(Commands), ConfigFileError );
-	if ( !ConfigFileError.str().empty() )
-		std::Debug << "config file " << ConfigFilename << " error: " << ConfigFileError.str() << std::endl;
-
+	
 	//	hard coded init commands
 	Commands.PushBack("setuppokey serial=21244 gridmap=0,0/1,0/2,0");
 	Commands.PushBack("setuppokey serial=22961 gridmap=0,1/1,1/2,1");
 	Commands.PushBack("setuppokey serial=22962 gridmap=lasergate");
+
+	Soy::FileToStringLines( ConfigFilename, GetArrayBridge(Commands), ConfigFileError );
+	if ( !ConfigFileError.str().empty() )
+		std::Debug << "config file " << ConfigFilename << " error: " << ConfigFileError.str() << std::endl;
+
 
 	for ( int i=0;	i<Commands.GetSize();	i++ )
 	{

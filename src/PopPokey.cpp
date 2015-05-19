@@ -480,7 +480,7 @@ void TPopPokey::OnPushLaserGateState(TJobAndChannel& JobAndChannel)
 	auto& Job = JobAndChannel.GetJob();
 	
 	bool State = false;
-	State = Job.mParams.GetParamAsWithDefault<int>("state", 0);
+	State = Job.mParams.GetParamAsWithDefault<int>("state", 0) != 0;
 	PushLaserGateState( State );
 	
 	TJobReply Reply( JobAndChannel );

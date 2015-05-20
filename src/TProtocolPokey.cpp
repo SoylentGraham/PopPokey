@@ -137,21 +137,60 @@ TDecodeResult::Type TProtocolPokey::DecodeHeader(TJob& Job,TChannelStream& Strea
 	}
 	else
 	{
+		//	old protocol size 14
+		//	new protocol size 19
 		//	assume is broadcast reply
 		if ( !Stream.Pop( 14-1, DataBridge ) )
 		{
 			Stream.UnPop(DataBridge);
 			return TDecodeResult::Waiting;
 		}
-		
+
 		//	gr: not sure why but have to use some data as signed and some as unsigned... not making sense to me, maybe encoding done wrong on pokey side
-		BufferArray<unsigned char,14> UData;
-		GetArrayBridge(UData).PushBackReinterpret( Data.GetArray(), Data.GetDataSize() );
-		
-		int Serial = ((int)UData[1]<<8) | (int)UData[2];
-		
+		BufferArray<unsigned char, 100> UData;
+		GetArrayBridge(UData).PushBackReinterpret(Data.GetArray(), Data.GetDataSize());
+
 		std::stringstream Version;
 		Version << (int)UData[3] << "." << (int)UData[4];
+
+		//	if new protocol
+		bool Protocol4913 = Version.str() == "49.13";
+		bool Protocol3352 = Version.str() == "33.52";
+		bool Protocol4800 = Version.str() == "48.0";
+
+		//	same protocol as newer
+		Protocol4913 |= Protocol4800;
+
+		if ( Protocol4913 )
+		{
+			if ( !Stream.Pop(5, DataBridge) )
+			{
+				Stream.UnPop(DataBridge);
+				return TDecodeResult::Waiting;
+			}
+			UData.Clear();
+			GetArrayBridge(UData).PushBackReinterpret(Data.GetArray(), Data.GetDataSize());
+		}
+		else if ( Protocol3352 )
+		{
+			
+		}
+		else
+		{
+			std::Debug << "unknown pokey protocol " << Version.str() << std::endl;
+			return TDecodeResult::Ignore;
+		}
+		
+		int Serial = 0;
+		if ( Protocol4913 )
+		{
+			Serial = ( (int)UData[15] << 8 ) | (int)UData[14];
+		}
+		else if ( Protocol3352 )
+		{
+			Serial = ( (int)UData[1] << 8 ) | (int)UData[2];
+		}
+
 		
 		std::stringstream Address;
 		Address << (int)UData[5] << "." << (int)UData[6] << "." << (int)UData[7] << "." << (int)UData[8];
@@ -164,7 +203,7 @@ TDecodeResult::Type TProtocolPokey::DecodeHeader(TJob& Job,TChannelStream& Strea
 		Job.mParams.AddParam("userid", static_cast<int>(UData[0]) );
 		Job.mParams.AddParam("version", Version.str() );
 		Job.mParams.AddParam("serial", Serial );
-		Job.mParams.AddParam("DhcpStatus", static_cast<int>(UData[9]) );
+		Job.mParams.AddParam("dhcpenabled", static_cast<int>(UData[9]) );
 		Job.mParams.AddParam("address", Address.str() );
 		Job.mParams.AddParam("hostaddress", HostAddress.str() );
 		return TDecodeResult::Success;

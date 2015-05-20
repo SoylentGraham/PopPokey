@@ -24,20 +24,37 @@ const char* TPokeyMeta::LaserGateOffReply = "lasergate_off";
 
 std::ostream& operator<< (std::ostream &out,const TPokeyMeta &in)
 {
-	//	gr@ chrome on windows thinks there's some binary in this output and won#t display inline
-	static bool s = true;
-	static bool cr = false;
+	static bool cr = true;
 	static bool addr = true;
 	static bool gridmap = true;
+	static bool v = true;
 
-	if ( s )
-		out << in.mSerial;
+	out << in.mSerial << "{";
 	if ( cr )
-		out << "{" << in.mChannelRef;
+	{
+		//	gr@ chrome on windows thinks there's some binary in this output and won#t display inline
+		//	out << in.mChannelRef;
+		if ( in.mChannelRef.IsValid() )
+			out << "has channel";
+		else
+			out << "no channel";
+	}
+
 	if ( addr )
-		out << "@" << in.mAddress << ";";
+	{
+		out << "@" << in.mAddress;
+		if ( in.HasBootupAddress() )
+			out << "(bootup)";
+		out << " " << ( in.mDhcpEnabled ? "dhcp ip" : "fixed ip" );
+		out << ";";
+	}
 	if ( gridmap )
-		out << in.GetGridMapString() << "}";
+		out << in.GetGridMapString();
+	if ( v )
+		out << " v" << in.mVersion;
+
+	out << "}";
+
 	return out;
 }
 
@@ -110,6 +127,8 @@ TPokeyDiscoverThread::TPokeyDiscoverThread(std::shared_ptr<TChannel>& Channel) :
 	Start();
 }
 
+
+
 bool TPokeyDiscoverThread::Iteration()
 {
 	if ( !mEnabled )
@@ -132,9 +151,16 @@ bool TPokeyDiscoverThread::Iteration()
 TPollPokeyThread::TPollPokeyThread(TChannelManager& Channels) :
 	mChannels		( Channels ),
 	SoyWorkerThread	( "TPollPokeyThread", SoyWorkerWaitMode::Sleep ),
-	mEnabled		( true )
+	mEnabled		( false )
 {
 	Start();
+}
+
+
+std::chrono::milliseconds TPollPokeyThread::GetSleepDuration()
+{
+	static int DurationMs = 13;
+	return std::chrono::milliseconds(DurationMs);
 }
 
 
@@ -330,9 +356,11 @@ void TPopPokey::OnDiscoverPokey(TJobAndChannel& JobAndChannel)
 	//	grab it's serial and see if it already exists
 	auto& Job = JobAndChannel.GetJob();
 
-	int Serial = Job.mParams.GetParamAsWithDefault<int>("serial",-1);
+	int Serial = Job.mParams.GetParamAsWithDefault<int>("serial", -1);
+	bool DhcpEnabled = Job.mParams.GetParamAsWithDefault<int>("dhcpenabled", 0)!=0;
 	auto Address = Job.mParams.GetParamAs<std::string>("address");
-	std::Debug << "discovered pokey #" << Serial << " at " << Address << std::endl;
+	auto Version = Job.mParams.GetParamAs<std::string>("version");
+	std::Debug << "discovered pokey #" << Serial << " at " << Address << " v" << Version << std::endl;
 	if ( Serial == -1 )
 	{
 		std::Debug << "got pokey discovery with no/invalid serial; " << Job.mParams << std::endl;
@@ -346,11 +374,23 @@ void TPopPokey::OnDiscoverPokey(TJobAndChannel& JobAndChannel)
 		std::Debug << "failed to create/find existing pokey after discovery; " << Job.mParams << std::endl;
 		return;
 	}
-	
+
 	//	update pokey meta, and if the channel differs (new, or replaced), then replace it
 	bool Changed = false;
 	//	todo: kill old channel
 	bool NewAddress = (Pokey->mAddress != Address);
+
+	if ( Pokey->mVersion != Version )
+	{
+		Pokey->mVersion = Version;
+		Changed = true;
+	}
+
+	if ( Pokey->mDhcpEnabled != DhcpEnabled )
+	{
+		Pokey->mDhcpEnabled = DhcpEnabled;
+		Changed = true;
+	}
 
 	if ( NewAddress )
 	{
@@ -365,19 +405,24 @@ void TPopPokey::OnDiscoverPokey(TJobAndChannel& JobAndChannel)
 	//	we cannot currently determine if the existing channel matches the address... this job won't come from the pokey's channel
 	if ( NewAddress || !Pokey->mChannelRef.IsValid() )
 	{
-		if ( Pokey->mChannelRef.IsValid() )
+		if ( !Pokey->HasBootupAddress() )
+			std::Debug << "skipping channel creation on pokey " << *Pokey << std::endl;
+		else if ( Pokey->mChannelRef.IsValid() )
 			std::Debug << "replacing channel on pokey " << *Pokey << std::endl;
 		else
 			std::Debug << "creating new channel on pokey " << *Pokey << std::endl;
 		
-		//	create a new pokey channel
-		SoyRef ChannelRef( Soy::StreamToString( std::stringstream() << Serial ).c_str() );
-		Pokey->mChannelRef = FindUnusedChannelRef( ChannelRef );
-		Changed = true;
-		std::shared_ptr<TChannel> PokeyChannel( new TChan<TChannelSocketTcpClient,TProtocolPokey>( Pokey->mChannelRef, Pokey->mAddress ) );
-		AddChannel( PokeyChannel );
-		if ( mPollPokeyThread )
-			mPollPokeyThread->AddPokeyChannel( PokeyChannel->GetChannelRef() );
+		if ( !Pokey->HasBootupAddress() )
+		{
+			//	create a new pokey channel
+			SoyRef ChannelRef(Soy::StreamToString(std::stringstream() << Serial).c_str());
+			Pokey->mChannelRef = FindUnusedChannelRef(ChannelRef);
+			Changed = true;
+			std::shared_ptr<TChannel> PokeyChannel(new TChan<TChannelSocketTcpClient, TProtocolPokey>(Pokey->mChannelRef, Pokey->mAddress));
+			AddChannel(PokeyChannel);
+			if ( mPollPokeyThread )
+				mPollPokeyThread->AddPokeyChannel(PokeyChannel->GetChannelRef());
+		}
 	}
 	
 	if ( Changed )
@@ -494,7 +539,7 @@ void TPopPokey::OnEnableDiscovery(TJobAndChannel& JobAndChannel)
 	Channel.OnJobCompleted(Reply);
 }
 
-void TPopPokey::OnDiscoveryDiscovery(TJobAndChannel& JobAndChannel)
+void TPopPokey::OnDisableDiscovery(TJobAndChannel& JobAndChannel)
 {
 	TJobReply Reply(JobAndChannel);
 

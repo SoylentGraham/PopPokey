@@ -61,10 +61,12 @@ public:
 	
 public:
 	TPokeyMeta() :
-		mSerial			( -1 )
+		mSerial			( -1 ),
+		mDhcpEnabled	( false )
 	{
 	}
 	
+	bool			HasBootupAddress() const { return mAddress == "10.0.0.250:20055"; }
 	bool			IsValid() const	{	return mSerial != -1;	}
 	bool			SetGridMap(const std::string& GridMapString,std::stringstream& Error);
 	std::string		GetGridMapString() const
@@ -77,6 +79,8 @@ public:
 	std::string			mAddress;
 	int					mSerial;
 	SoyRef				mChannelRef;
+	std::string			mVersion;
+	bool				mDhcpEnabled;
 };
 std::ostream& operator<< (std::ostream &out,const TPokeyMeta &in);
 
@@ -95,6 +99,7 @@ public:
 
 	bool			IsEnabled() const { return mEnabled; }
 	void			Enable(bool Enable) { mEnabled = Enable; }
+	virtual std::chrono::milliseconds	GetSleepDuration();
 
 public:
 	void				SendGetDeviceMeta();
@@ -118,7 +123,7 @@ public:
 	bool			IsEnabled() const	{ return mEnabled; }
 	void			Enable(bool Enable)	{ mEnabled = Enable; }
 	virtual bool	Iteration() override;
-	virtual std::chrono::milliseconds	GetSleepDuration()	{	return std::chrono::milliseconds(1000);	}
+	virtual std::chrono::milliseconds	GetSleepDuration()	{	return std::chrono::milliseconds(2000);	}
 
 	std::shared_ptr<TChannel>&	mChannel;
 	bool						mEnabled;

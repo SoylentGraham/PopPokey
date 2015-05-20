@@ -92,7 +92,10 @@ public:
 	{
 		mPokeyChannels.PushBack( ChannelRef );
 	}
-	
+
+	bool			IsEnabled() const { return mEnabled; }
+	void			Enable(bool Enable) { mEnabled = Enable; }
+
 public:
 	void				SendGetDeviceMeta();
 	void				SendGetUserMeta();
@@ -102,6 +105,7 @@ public:
 private:
 	Array<SoyRef>		mPokeyChannels;
 	TChannelManager&	mChannels;
+	bool				mEnabled;
 };
 
 
@@ -111,10 +115,13 @@ class TPokeyDiscoverThread : public SoyWorkerThread
 public:
 	TPokeyDiscoverThread(std::shared_ptr<TChannel>& Channel);
 	
+	bool			IsEnabled() const	{ return mEnabled; }
+	void			Enable(bool Enable)	{ mEnabled = Enable; }
 	virtual bool	Iteration() override;
 	virtual std::chrono::milliseconds	GetSleepDuration()	{	return std::chrono::milliseconds(1000);	}
 
 	std::shared_ptr<TChannel>&	mChannel;
+	bool						mEnabled;
 };
 
 class TPopPokey : public TJobHandler, public TChannelManager
@@ -127,13 +134,18 @@ public:
 	void			OnInitPokey(TJobAndChannel& JobAndChannel);
 	void			OnSetupPokey(TJobAndChannel& JobAndChannel);
 	void			OnDiscoverPokey(TJobAndChannel& JobAndChannel);
+	void			OnListPokeys(TJobAndChannel& JobChannel);
 	void			OnPopGridCoord(TJobAndChannel& JobAndChannel);
 	void			OnPushGridCoord(TJobAndChannel& JobAndChannel);
 	void			OnPopLaserGateState(TJobAndChannel& JobAndChannel);
 	void			OnPushLaserGateState(TJobAndChannel& JobAndChannel);
 	void			OnUnknownPokeyReply(TJobAndChannel& JobAndChannel);
 	void			OnPokeyPollReply(TJobAndChannel& JobAndChannel);
-	
+	void			OnEnableDiscovery(TJobAndChannel& JobAndChannel);
+	void			OnDisableDiscovery(TJobAndChannel& JobAndChannel);
+	void			OnEnablePoll(TJobAndChannel& JobAndChannel);
+	void			OnDisablePoll(TJobAndChannel& JobAndChannel);
+
 	std::shared_ptr<TPokeyMeta>	GetPokey(const TPokeyMeta& Pokey);
 	std::shared_ptr<TPokeyMeta>	GetPokey(int Serial,bool Create=false);
 	std::shared_ptr<TPokeyMeta>	GetPokey(SoyRef ChannelRef);
@@ -142,7 +154,9 @@ public:
 	void			UpdatePinState(TPokeyMeta& Pokey,uint64 Pins);
 	void			PushGridCoord(vec2x<int> GridCoord);
 	void			PushLaserGateState(bool State);
-	
+	bool			EnableDiscovery(bool Enable, bool& OldState);
+	bool			EnablePoll(bool Enable, bool& OldState);
+
 public:
 	Soy::Platform::TConsoleApp	mConsoleApp;
 

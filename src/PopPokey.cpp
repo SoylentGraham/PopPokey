@@ -24,7 +24,20 @@ const char* TPokeyMeta::LaserGateOffReply = "lasergate_off";
 
 std::ostream& operator<< (std::ostream &out,const TPokeyMeta &in)
 {
-	out << in.mSerial << "{" << in.mChannelRef << "@" << in.mAddress << ";" << in.GetGridMapString() << "}";
+	//	gr@ chrome on windows thinks there's some binary in this output and won#t display inline
+	static bool s = true;
+	static bool cr = false;
+	static bool addr = true;
+	static bool gridmap = true;
+
+	if ( s )
+		out << in.mSerial;
+	if ( cr )
+		out << "{" << in.mChannelRef;
+	if ( addr )
+		out << "@" << in.mAddress << ";";
+	if ( gridmap )
+		out << in.GetGridMapString() << "}";
 	return out;
 }
 
@@ -91,13 +104,16 @@ bool TPokeyMeta::SetGridMap(const std::string& GridMapString,std::stringstream& 
 	
 TPokeyDiscoverThread::TPokeyDiscoverThread(std::shared_ptr<TChannel>& Channel) :
 	mChannel		( Channel ),
-	SoyWorkerThread	( Soy::GetTypeName(*this), SoyWorkerWaitMode::Sleep )
+	SoyWorkerThread	( Soy::GetTypeName(*this), SoyWorkerWaitMode::Sleep ),
+	mEnabled( true )
 {
 	Start();
 }
 
 bool TPokeyDiscoverThread::Iteration()
 {
+	if ( !mEnabled )
+		return true;
 	auto Channel = mChannel;
 	if ( !Channel )
 		return true;
@@ -115,7 +131,8 @@ bool TPokeyDiscoverThread::Iteration()
 
 TPollPokeyThread::TPollPokeyThread(TChannelManager& Channels) :
 	mChannels		( Channels ),
-	SoyWorkerThread	( "TPollPokeyThread", SoyWorkerWaitMode::Sleep )
+	SoyWorkerThread	( "TPollPokeyThread", SoyWorkerWaitMode::Sleep ),
+	mEnabled		( true )
 {
 	Start();
 }
@@ -123,6 +140,8 @@ TPollPokeyThread::TPollPokeyThread(TChannelManager& Channels) :
 
 bool TPollPokeyThread::Iteration()
 {
+	if ( !mEnabled )
+		return true;
 //	SendGetDeviceMeta();
 //	SendGetUserMeta();
 	SendGetDeviceState();
@@ -186,8 +205,10 @@ TPopPokey::TPopPokey() :
 	TParameterTraits SetupPokeyTraits;
 	SetupPokeyTraits.mRequiredKeys.PushBack("gridmap");
 	SetupPokeyTraits.mRequiredKeys.PushBack("serial");
-	AddJobHandler("SetupPokey", SetupPokeyTraits, *this, &TPopPokey::OnSetupPokey );
-	
+	AddJobHandler("SetupPokey", SetupPokeyTraits, *this, &TPopPokey::OnSetupPokey);
+
+	AddJobHandler("list", TParameterTraits(), *this, &TPopPokey::OnListPokeys);
+
 	TParameterTraits PopGridCoordTraits;
 	AddJobHandler("PopGridCoord", PopGridCoordTraits, *this, &TPopPokey::OnPopGridCoord );
 	
@@ -215,6 +236,10 @@ TPopPokey::TPopPokey() :
 	mPollPokeyThread.reset( new TPollPokeyThread( static_cast<TChannelManager&>(*this) ) );
 	mDiscoverPokeyThread.reset( new TPokeyDiscoverThread( mDiscoverPokeyChannel ) );
 	
+	AddJobHandler("enablediscovery", TParameterTraits(), *this, &TPopPokey::OnEnableDiscovery);
+	AddJobHandler("disablediscovery", TParameterTraits(), *this, &TPopPokey::OnDisableDiscovery);
+	AddJobHandler("enablepoll", TParameterTraits(), *this, &TPopPokey::OnEnablePoll);
+	AddJobHandler("disablepoll", TParameterTraits(), *this, &TPopPokey::OnDisablePoll);
 }
 
 void TPopPokey::AddChannel(std::shared_ptr<TChannel> Channel)
@@ -306,6 +331,8 @@ void TPopPokey::OnDiscoverPokey(TJobAndChannel& JobAndChannel)
 	auto& Job = JobAndChannel.GetJob();
 
 	int Serial = Job.mParams.GetParamAsWithDefault<int>("serial",-1);
+	auto Address = Job.mParams.GetParamAs<std::string>("address");
+	std::Debug << "discovered pokey #" << Serial << " at " << Address << std::endl;
 	if ( Serial == -1 )
 	{
 		std::Debug << "got pokey discovery with no/invalid serial; " << Job.mParams << std::endl;
@@ -323,7 +350,6 @@ void TPopPokey::OnDiscoverPokey(TJobAndChannel& JobAndChannel)
 	//	update pokey meta, and if the channel differs (new, or replaced), then replace it
 	bool Changed = false;
 	//	todo: kill old channel
-	auto Address = Job.mParams.GetParamAs<std::string>("address");
 	bool NewAddress = (Pokey->mAddress != Address);
 
 	if ( NewAddress )
@@ -395,44 +421,128 @@ void TPopPokey::OnInitPokey(TJobAndChannel& JobAndChannel)
 void TPopPokey::OnSetupPokey(TJobAndChannel& JobAndChannel)
 {
 	auto& Job = JobAndChannel.GetJob();
-	
+
 	//	get the required params
 	auto GridMap = Job.mParams.GetParamAs<std::string>("gridmap");
-	
+
 	//	how do we identify the pokey
-	int Serial = Job.mParams.GetParamAsWithDefault<int>("serial",-1);
+	int Serial = Job.mParams.GetParamAsWithDefault<int>("serial", -1);
 
 	if ( Serial == -1 )
 	{
-		TJobReply Reply( JobAndChannel );
+		TJobReply Reply(JobAndChannel);
 		std::stringstream Error;
 		Error << "failed to parse serial param when setting gridmap=" << GridMap;
 		Reply.mParams.AddErrorParam(Error.str());
-		
+
 		TChannel& Channel = JobAndChannel;
-		Channel.OnJobCompleted( Reply );
+		Channel.OnJobCompleted(Reply);
 		return;
 
 	}
 
 	//	fetch pokey
-	std::shared_ptr<TPokeyMeta> Pokey = GetPokey( Serial, true );
+	std::shared_ptr<TPokeyMeta> Pokey = GetPokey(Serial, true);
 	std::stringstream Error;
-	Pokey->SetGridMap( GridMap, Error );
+	Pokey->SetGridMap(GridMap, Error);
 
-	TJobReply Reply( JobAndChannel );
-	
+	TJobReply Reply(JobAndChannel);
+
 	if ( !Error.str().empty() )
-		Reply.mParams.AddErrorParam( Error.str() );
+		Reply.mParams.AddErrorParam(Error.str());
 
 	std::stringstream Debug;
-	Debug << "Updated pokey " << (*Pokey) << " with gridmap: " << Pokey->GetGridMapString();
+	Debug << "Updated pokey " << ( *Pokey ) << " with gridmap: " << Pokey->GetGridMapString();
 	std::Debug << Debug.str() << std::endl;
-	Reply.mParams.AddDefaultParam( Debug.str() );
+	Reply.mParams.AddDefaultParam(Debug.str());
 
-	
+
 	TChannel& Channel = JobAndChannel;
-	Channel.OnJobCompleted( Reply );
+	Channel.OnJobCompleted(Reply);
+}
+void TPopPokey::OnListPokeys(TJobAndChannel& JobAndChannel)
+{
+	TJobReply Reply(JobAndChannel);
+
+	std::stringstream ReplyString;
+	mPokeysLock.lock();
+	for ( int i = 0; i < mPokeys.GetSize(); i++ )
+		ReplyString << *mPokeys[i] << std::endl;
+	mPokeysLock.unlock();
+
+	Reply.mParams.AddDefaultParam(ReplyString.str());
+
+	TChannel& Channel = JobAndChannel;
+	Channel.OnJobCompleted(Reply);
+}
+
+
+void TPopPokey::OnEnableDiscovery(TJobAndChannel& JobAndChannel)
+{
+	TJobReply Reply(JobAndChannel);
+
+	bool OldState;
+	bool NewState = EnableDiscovery(true, OldState);
+
+	std::stringstream ReplyString;
+	ReplyString << "broadcast now " << ( NewState ? "enabled" : "disabled" ) << ", was " << ( OldState ? "enabled" : "disabled" );
+	std::Debug << ReplyString.str() << std::endl;
+
+	Reply.mParams.AddDefaultParam(ReplyString.str());
+
+	TChannel& Channel = JobAndChannel;
+	Channel.OnJobCompleted(Reply);
+}
+
+void TPopPokey::OnDiscoveryDiscovery(TJobAndChannel& JobAndChannel)
+{
+	TJobReply Reply(JobAndChannel);
+
+	bool OldState;
+	bool NewState = EnableDiscovery(false, OldState);
+
+	std::stringstream ReplyString;
+	ReplyString << "broadcast now " << ( NewState ? "enabled" : "disabled" ) << ", was " << ( OldState ? "enabled" : "disabled" );
+	std::Debug << ReplyString.str() << std::endl;
+
+	Reply.mParams.AddDefaultParam(ReplyString.str());
+
+	TChannel& Channel = JobAndChannel;
+	Channel.OnJobCompleted(Reply);
+}
+
+void TPopPokey::OnEnablePoll(TJobAndChannel& JobAndChannel)
+{
+	TJobReply Reply(JobAndChannel);
+
+	bool OldState;
+	bool NewState = EnablePoll(true, OldState);
+
+	std::stringstream ReplyString;
+	ReplyString << "pokey poll now " << ( NewState ? "enabled" : "disabled" ) << ", was " << ( OldState ? "enabled" : "disabled" );
+	std::Debug << ReplyString.str() << std::endl;
+
+	Reply.mParams.AddDefaultParam(ReplyString.str());
+
+	TChannel& Channel = JobAndChannel;
+	Channel.OnJobCompleted(Reply);
+}
+
+void TPopPokey::OnDisablePoll(TJobAndChannel& JobAndChannel)
+{
+	TJobReply Reply(JobAndChannel);
+
+	bool OldState;
+	bool NewState = EnablePoll(false, OldState);
+
+	std::stringstream ReplyString;
+	ReplyString << "pokey poll now " << ( NewState ? "enabled" : "disabled" ) << ", was " << ( OldState ? "enabled" : "disabled" );
+	std::Debug << ReplyString.str() << std::endl;
+
+	Reply.mParams.AddDefaultParam(ReplyString.str());
+
+	TChannel& Channel = JobAndChannel;
+	Channel.OnJobCompleted(Reply);
 }
 
 
@@ -523,6 +633,33 @@ void TPopPokey::OnUnknownPokeyReply(TJobAndChannel& JobAndChannel)
 	std::Debug << "got pokey reply from " << Channel.GetChannelRef() << ": RequestId #" << Job.mParams.GetParamAs<int>("requestid") << std::endl;
 	std::Debug << Job.mParams << std::endl;
 }
+
+bool TPopPokey::EnableDiscovery(bool Enable, bool& OldState)
+{
+	if ( !mDiscoverPokeyThread )
+	{
+		OldState = false;
+		return false;
+	}
+
+	OldState = mDiscoverPokeyThread->IsEnabled();
+	mDiscoverPokeyThread->Enable(Enable);
+	return mDiscoverPokeyThread->IsEnabled();
+}
+
+bool TPopPokey::EnablePoll(bool Enable, bool& OldState)
+{
+	if ( !mPollPokeyThread )
+	{
+		OldState = false;
+		return false;
+	}
+
+	OldState = mPollPokeyThread->IsEnabled();
+	mPollPokeyThread->Enable(Enable);
+	return mPollPokeyThread->IsEnabled();
+}
+
 
 void TPopPokey::UpdatePinState(TPokeyMeta& Pokey,const ArrayBridge<char>& Pins)
 {

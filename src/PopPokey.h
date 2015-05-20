@@ -68,10 +68,14 @@ public:
 	
 	bool			HasBootupAddress() const { return mAddress == "10.0.0.250:20055"; }
 	bool			IsValid() const	{	return mSerial != -1;	}
-	bool			SetGridMap(const std::string& GridMapString,std::stringstream& Error);
+	bool			SetGridMap(std::string GridMapString,std::stringstream& Error);
 	std::string		GetGridMapString() const
 	{
 		return Soy::StringJoin( GetArrayBridge(mPinToGridMap), CoordDelim );
+	}
+	int				GetGridMapCount() const
+	{
+		return mPinToGridMap.GetSize();
 	}
 
 public:

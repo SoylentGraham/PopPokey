@@ -49,7 +49,7 @@ std::ostream& operator<< (std::ostream &out,const TPokeyMeta &in)
 		out << ";";
 	}
 	if ( gridmap )
-		out << in.GetGridMapString();
+		out << in.GetGridMapString().substr(0, 10) << "... x" << in.GetGridMapCount();
 	if ( v )
 		out << " v" << in.mVersion;
 
@@ -65,12 +65,17 @@ std::ostream& operator<< (std::ostream &out,const vec2x<int> &in)
 }
 
 
-bool TPokeyMeta::SetGridMap(const std::string& GridMapString,std::stringstream& Error)
+bool TPokeyMeta::SetGridMap(std::string GridMapString,std::stringstream& Error)
 {
 	mPinToGridMap.Clear();
 	
+	//	repalce tab
+	for ( int i = 0; i < GridMapString.length(); i++ )
+		if ( GridMapString[i] == '\t' )
+			GridMapString[i] = CoordDelim[0];
+
 	Array<std::string> IndexStrings;
-	Soy::StringSplitByString( GetArrayBridge(IndexStrings), GridMapString, CoordDelim );
+	Soy::StringSplitByString( GetArrayBridge(IndexStrings), GridMapString, CoordDelim, false );
 	
 	if ( IndexStrings.IsEmpty() && !GridMapString.empty() )
 	{
@@ -151,7 +156,7 @@ bool TPokeyDiscoverThread::Iteration()
 TPollPokeyThread::TPollPokeyThread(TChannelManager& Channels) :
 	mChannels		( Channels ),
 	SoyWorkerThread	( "TPollPokeyThread", SoyWorkerWaitMode::Sleep ),
-	mEnabled		( false )
+	mEnabled		( true )
 {
 	Start();
 }
@@ -360,7 +365,7 @@ void TPopPokey::OnDiscoverPokey(TJobAndChannel& JobAndChannel)
 	bool DhcpEnabled = Job.mParams.GetParamAsWithDefault<int>("dhcpenabled", 0)!=0;
 	auto Address = Job.mParams.GetParamAs<std::string>("address");
 	auto Version = Job.mParams.GetParamAs<std::string>("version");
-	std::Debug << "discovered pokey #" << Serial << " at " << Address << " v" << Version << std::endl;
+//	std::Debug << "discovered pokey #" << Serial << " at " << Address << " v" << Version << std::endl;
 	if ( Serial == -1 )
 	{
 		std::Debug << "got pokey discovery with no/invalid serial; " << Job.mParams << std::endl;

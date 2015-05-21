@@ -73,13 +73,13 @@ public:
 	{
 		return Soy::StringJoin( GetArrayBridge(mPinToGridMap), CoordDelim );
 	}
-	int				GetGridMapCount() const
+	size_t			GetGridMapCount() const
 	{
 		return mPinToGridMap.GetSize();
 	}
 
 public:
-	BufferArray<vec2x<int>,55>	mPinToGridMap;
+	BufferArray<vec2x<int>,100>	mPinToGridMap;
 	std::string			mAddress;
 	int					mSerial;
 	SoyRef				mChannelRef;
@@ -138,7 +138,7 @@ class TPopPokey : public TJobHandler, public TChannelManager
 public:
 	TPopPokey();
 	
-	virtual void	AddChannel(std::shared_ptr<TChannel> Channel) override;
+	virtual bool	AddChannel(std::shared_ptr<TChannel> Channel) override;
 
 	void			OnInitPokey(TJobAndChannel& JobAndChannel);
 	void			OnSetupPokey(TJobAndChannel& JobAndChannel);
@@ -154,6 +154,7 @@ public:
 	void			OnDisableDiscovery(TJobAndChannel& JobAndChannel);
 	void			OnEnablePoll(TJobAndChannel& JobAndChannel);
 	void			OnDisablePoll(TJobAndChannel& JobAndChannel);
+	void			OnFakeDiscoverPokeys(TJobAndChannel& JobAndChannel);
 
 	std::shared_ptr<TPokeyMeta>	GetPokey(const TPokeyMeta& Pokey);
 	std::shared_ptr<TPokeyMeta>	GetPokey(int Serial,bool Create=false);

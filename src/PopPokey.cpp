@@ -271,14 +271,20 @@ TPopPokey::TPopPokey() :
 	AddJobHandler("disablediscovery", TParameterTraits(), *this, &TPopPokey::OnDisableDiscovery);
 	AddJobHandler("enablepoll", TParameterTraits(), *this, &TPopPokey::OnEnablePoll);
 	AddJobHandler("disablepoll", TParameterTraits(), *this, &TPopPokey::OnDisablePoll);
+
+	TParameterTraits FakeDiscoverTraits;
+	FakeDiscoverTraits.mAssumedKeys.PushBack("count");
+	AddJobHandler("fakediscover", FakeDiscoverTraits, *this, &TPopPokey::OnFakeDiscoverPokeys );
+
 }
 
-void TPopPokey::AddChannel(std::shared_ptr<TChannel> Channel)
+bool TPopPokey::AddChannel(std::shared_ptr<TChannel> Channel)
 {
-	TChannelManager::AddChannel( Channel );
-	if ( !Channel )
-		return;
+	if ( !TChannelManager::AddChannel( Channel ) )
+		return false;
+
 	TJobHandler::BindToChannel( *Channel );
+	return true;
 }
 
 std::shared_ptr<TPokeyMeta> TPopPokey::GetPokey(const TPokeyMeta &Pokey)
@@ -355,6 +361,28 @@ void TPopPokey::OnPokeyPollReply(TJobAndChannel& JobAndChannel)
 	UpdatePinState( *Pokey, GetArrayBridge(Pins) );
 }
 
+void TPopPokey::OnFakeDiscoverPokeys(TJobAndChannel& JobAndChannel)
+{
+	auto& Job = JobAndChannel.GetJob();
+	int FakeCount = Job.mParams.GetParamAsWithDefault<int>("count",100);
+	
+	//	trigger x fake jobs
+	for ( int i=0;	i<FakeCount;	i++ )
+	{
+		TJob NewJob;
+		NewJob.mParams.AddParam<int>("serial",9900+i);
+		
+		//	random address
+		std::stringstream Address;
+		int Port = 2600+i;
+		Address << (rand()%256) << '.' << (rand()%256) << '.' << (rand()%256) << '.' << (rand()%256) << ':' << Port;
+		NewJob.mParams.AddParam("address", Address.str() );
+		NewJob.mParams.AddParam("version", "fake" );
+	
+		TJobAndChannel NewJobAndChannel( NewJob, JobAndChannel.GetChannel() );
+		OnDiscoverPokey( NewJobAndChannel );
+	}
+}
 
 void TPopPokey::OnDiscoverPokey(TJobAndChannel& JobAndChannel)
 {
@@ -423,6 +451,7 @@ void TPopPokey::OnDiscoverPokey(TJobAndChannel& JobAndChannel)
 			SoyRef ChannelRef(Soy::StreamToString(std::stringstream() << Serial).c_str());
 			Pokey->mChannelRef = FindUnusedChannelRef(ChannelRef);
 			Changed = true;
+			
 			std::shared_ptr<TChannel> PokeyChannel(new TChan<TChannelSocketTcpClient, TProtocolPokey>(Pokey->mChannelRef, Pokey->mAddress));
 			AddChannel(PokeyChannel);
 			if ( mPollPokeyThread )

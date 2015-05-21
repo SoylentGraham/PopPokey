@@ -858,6 +858,10 @@ TPopAppError::Type PopMain(TJobParams& Params)
 	for ( int i=0;	i<Commands.GetSize();	i++ )
 	{
 		auto Command = Commands[i];
+
+		if ( Command.empty() || Command[0] == '#' )
+			continue;
+
 		TProtocolCli Protocol;
 		TJob Job;
 		if ( !Protocol.DecodeHeader( Job, Command ) )

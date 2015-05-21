@@ -184,6 +184,9 @@
     <ClCompile Include="..\..\PopTrack\src\TParameters.cpp">
       <Filter>pop</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\ofxSoylent\src\SoyAssert.cpp">
+      <Filter>soy</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\PopPokey.h">
@@ -383,6 +386,9 @@
     </ClInclude>
     <ClInclude Include="..\..\PopTrack\src\TParameters.h">
       <Filter>pop</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\ofxSoylent\src\SoyAssert.h">
+      <Filter>soy</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

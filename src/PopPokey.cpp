@@ -240,9 +240,9 @@ TPopPokey::TPopPokey() :
 
 	AddJobHandler("list", TParameterTraits(), *this, &TPopPokey::OnListPokeys);
 
-	TParameterTraits PopGridCoordTraits;
-	AddJobHandler("PopGridCoord", PopGridCoordTraits, *this, &TPopPokey::OnPopGridCoord );
-	
+	AddJobHandler("PopGridCoord", TParameterTraits(), *this, &TPopPokey::OnPopGridCoord);
+	AddJobHandler("PeekGridCoord", TParameterTraits(), *this, &TPopPokey::OnPeekGridCoord);
+
 	TParameterTraits PushGridCoordTraits;
 	PushGridCoordTraits.mAssumedKeys.PushBack("pinx");
 	PushGridCoordTraits.mRequiredKeys.PushBack("pinx");
@@ -250,9 +250,9 @@ TPopPokey::TPopPokey() :
 	PushGridCoordTraits.mRequiredKeys.PushBack("piny");
 	AddJobHandler("PushGridCoord", PushGridCoordTraits, *this, &TPopPokey::OnPushGridCoord );
 	
-	TParameterTraits PopLaserGateStateTraits;
-	AddJobHandler("PopLaserGate", PopLaserGateStateTraits, *this, &TPopPokey::OnPopLaserGateState );
-	
+	AddJobHandler("PopLaserGate", TParameterTraits(), *this, &TPopPokey::OnPopLaserGateState);
+	AddJobHandler("PeekLaserGate", TParameterTraits(), *this, &TPopPokey::OnPeekLaserGateState);
+
 	TParameterTraits PushLaserGateStateTraits;
 	PushLaserGateStateTraits.mAssumedKeys.PushBack("state");
 	PushLaserGateStateTraits.mRequiredKeys.PushBack("state");
@@ -343,6 +343,7 @@ void TPopPokey::OnPokeyPollReply(TJobAndChannel& JobAndChannel)
 	auto Pokey = GetPokey( Job.mChannelMeta.mChannelRef );
 	if ( !Pokey )
 	{
+		//	gr: this comes up if you change pokey addresses whilst running... channel ref has been overwritten?
 		std::Debug << "got pokey poll reply, but didn't match pokey ref " << Job.mChannelMeta.mChannelRef << std::endl;
 		return;
 	}
@@ -546,7 +547,19 @@ void TPopPokey::OnListPokeys(TJobAndChannel& JobAndChannel)
 	std::stringstream ReplyString;
 	mPokeysLock.lock();
 	for ( int i = 0; i < mPokeys.GetSize(); i++ )
-		ReplyString << *mPokeys[i] << std::endl;
+	{
+		//	get channel state
+		auto pChannel = GetChannel(mPokeys[i]->mChannelRef);
+		std::string ConnectionStatus;
+		if ( !pChannel )
+			ConnectionStatus = "never connected";
+		else if ( !pChannel->IsConnected() )
+			ConnectionStatus = "disconnected";
+		else
+			ConnectionStatus = "connected";
+
+		ReplyString << *mPokeys[i] << " " << ConnectionStatus << std::endl;
+	}
 	mPokeysLock.unlock();
 
 	Reply.mParams.AddDefaultParam(ReplyString.str());
@@ -664,6 +677,25 @@ void TPopPokey::OnPopGridCoord(TJobAndChannel& JobAndChannel)
 	Channel.OnJobCompleted( Reply );
 }
 
+
+void TPopPokey::OnPeekGridCoord(TJobAndChannel& JobAndChannel)
+{
+	auto& Job = JobAndChannel.GetJob();
+
+	auto LastGridCoord = mLastGridCoord;
+
+	TJobReply Reply(JobAndChannel);
+	std::stringstream ReplyString;
+	if ( LastGridCoord == TPokeyMeta::GridCoordLaserGate )
+		ReplyString << "lasergate";
+	else
+		ReplyString << LastGridCoord;
+	Reply.mParams.AddDefaultParam(ReplyString.str());
+
+	TChannel& Channel = JobAndChannel;
+	Channel.OnJobCompleted(Reply);
+}
+
 void TPopPokey::OnPushLaserGateState(TJobAndChannel& JobAndChannel)
 {
 	auto& Job = JobAndChannel.GetJob();
@@ -684,22 +716,41 @@ void TPopPokey::OnPushLaserGateState(TJobAndChannel& JobAndChannel)
 void TPopPokey::OnPopLaserGateState(TJobAndChannel& JobAndChannel)
 {
 	auto& Job = JobAndChannel.GetJob();
-	
+
 	mLastGridCoordLock.lock();
 	auto LastState = mLaserGateState;
 	mLaserGateState = false;
 	mLastGridCoordLock.unlock();
-	
-	TJobReply Reply( JobAndChannel );
+
+	TJobReply Reply(JobAndChannel);
 	std::stringstream ReplyString;
 	if ( LastState )
 		ReplyString << "lasergate_on";
 	else
 		ReplyString << "lasergate_off";
-	Reply.mParams.AddDefaultParam( ReplyString.str() );
-	
+	Reply.mParams.AddDefaultParam(ReplyString.str());
+
 	TChannel& Channel = JobAndChannel;
-	Channel.OnJobCompleted( Reply );
+	Channel.OnJobCompleted(Reply);
+}
+
+
+void TPopPokey::OnPeekLaserGateState(TJobAndChannel& JobAndChannel)
+{
+	auto& Job = JobAndChannel.GetJob();
+
+	auto LastState = mLaserGateState;
+
+	TJobReply Reply(JobAndChannel);
+	std::stringstream ReplyString;
+	if ( LastState )
+		ReplyString << "lasergate_on";
+	else
+		ReplyString << "lasergate_off";
+	Reply.mParams.AddDefaultParam(ReplyString.str());
+
+	TChannel& Channel = JobAndChannel;
+	Channel.OnJobCompleted(Reply);
 }
 
 

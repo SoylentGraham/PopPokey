@@ -764,6 +764,10 @@ void TPopPokey::OnPeekGridCoord(TJobAndChannel& JobAndChannel)
 	auto& Job = JobAndChannel.GetJob();
 
 	auto LastGridCoord = mLastGridCoord;
+	//	if its been X secs since coord was changed, then return invalid
+	auto TimeDiff = SoyTime(true).GetTime() - mLastGridCoordTime.GetTime();
+	if ( TimeDiff > 1000 )
+		LastGridCoord = TPokeyMeta::GridCoordInvalid;
 
 	TJobReply Reply(JobAndChannel);
 	std::stringstream ReplyString;
@@ -821,6 +825,10 @@ void TPopPokey::OnPeekLaserGateState(TJobAndChannel& JobAndChannel)
 	auto& Job = JobAndChannel.GetJob();
 
 	auto LastState = mLaserGateState;
+	//	if its been X secs since coord was changed, then return invalid
+	auto TimeDiff = SoyTime(true).GetTime() - mLastLaserGateTime.GetTime();
+	if ( TimeDiff > 1000 )
+		LastState = false;
 
 	TJobReply Reply(JobAndChannel);
 	std::stringstream ReplyString;
@@ -904,6 +912,7 @@ void TPopPokey::PushGridCoord(vec2x<int> GridCoord)
 	
 	mLastGridCoordLock.lock();
 	mLastGridCoord = GridCoord;
+	mLastGridCoordTime = SoyTime(true);
 	mLastGridCoordLock.unlock();
 	
 	std::Debug << "pin set to " << GridCoord << std::endl;
@@ -914,6 +923,7 @@ void TPopPokey::PushLaserGateState(bool State)
 {
 	mLastGridCoordLock.lock();
 	mLaserGateState = State;
+	mLastLaserGateTime = SoyTime(true);
 	mLastGridCoordLock.unlock();
 	
 	std::Debug << "laser gate set to " << State << std::endl;

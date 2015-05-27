@@ -133,6 +133,7 @@ public:
 	bool						mEnabled;
 };
 
+
 class TPopPokey : public TJobHandler, public TChannelManager
 {
 public:
@@ -177,7 +178,7 @@ public:
 
 	std::shared_ptr<TPokeyDiscoverThread>	mDiscoverPokeyThread;
 	std::shared_ptr<TPollPokeyThread>	mPollPokeyThread;
-	
+
 	std::shared_ptr<TChannel>	mDiscoverPokeyChannel;
 	
 	std::mutex					mPokeysLock;	//	for when resizing array
@@ -186,6 +187,9 @@ public:
 	std::mutex					mLastGridCoordLock;
 	vec2x<int>					mLastGridCoord;
 	bool						mLaserGateState;
+
+	SoyTime						mLastGridCoordTime;		//	time coord was last set
+	SoyTime						mLastLaserGateTime;		//	time coord was last set
 };
 
 

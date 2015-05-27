@@ -137,6 +137,7 @@ class TPopPokey : public TJobHandler, public TChannelManager
 {
 public:
 	TPopPokey();
+	virtual ~TPopPokey();
 	
 	virtual bool	AddChannel(std::shared_ptr<TChannel> Channel) override;
 
@@ -144,6 +145,8 @@ public:
 	void			OnSetupPokey(TJobAndChannel& JobAndChannel);
 	void			OnDiscoverPokey(TJobAndChannel& JobAndChannel);
 	void			OnListPokeys(TJobAndChannel& JobChannel);
+	void			OnGetStatus(TJobAndChannel& JobChannel);
+	void			OnExit(TJobAndChannel& JobChannel);
 	void			OnPopGridCoord(TJobAndChannel& JobAndChannel);
 	void			OnPeekGridCoord(TJobAndChannel& JobAndChannel);
 	void			OnPushGridCoord(TJobAndChannel& JobAndChannel);

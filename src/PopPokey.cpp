@@ -239,6 +239,8 @@ TPopPokey::TPopPokey() :
 	AddJobHandler("SetupPokey", SetupPokeyTraits, *this, &TPopPokey::OnSetupPokey);
 
 	AddJobHandler("list", TParameterTraits(), *this, &TPopPokey::OnListPokeys);
+	AddJobHandler("exit", TParameterTraits(), *this, &TPopPokey::OnExit);
+	AddJobHandler("error", TParameterTraits(), *this, &TPopPokey::OnGetStatus);
 
 	AddJobHandler("PopGridCoord", TParameterTraits(), *this, &TPopPokey::OnPopGridCoord);
 	AddJobHandler("PeekGridCoord", TParameterTraits(), *this, &TPopPokey::OnPeekGridCoord);
@@ -277,6 +279,34 @@ TPopPokey::TPopPokey() :
 	AddJobHandler("fakediscover", FakeDiscoverTraits, *this, &TPopPokey::OnFakeDiscoverPokeys );
 
 }
+
+
+TPopPokey::~TPopPokey()
+{
+	//	stop threads async
+	if ( mPollPokeyThread )
+		mPollPokeyThread->Stop();
+	
+	if ( mDiscoverPokeyThread )
+		mDiscoverPokeyThread->Stop();
+	
+	//	kill threads
+	if ( mPollPokeyThread )
+	{
+		mPollPokeyThread->WaitToFinish();
+		mPollPokeyThread.reset();
+	}
+	
+	if ( mDiscoverPokeyThread )
+	{
+		mDiscoverPokeyThread->WaitToFinish();
+		mDiscoverPokeyThread.reset();
+	}
+	
+	//	shutdown channel manager
+	//	shutdown job threads...
+}
+
 
 bool TPopPokey::AddChannel(std::shared_ptr<TChannel> Channel)
 {
@@ -540,6 +570,57 @@ void TPopPokey::OnSetupPokey(TJobAndChannel& JobAndChannel)
 	TChannel& Channel = JobAndChannel;
 	Channel.OnJobCompleted(Reply);
 }
+
+void TPopPokey::OnExit(TJobAndChannel& JobAndChannel)
+{
+	mConsoleApp.Exit();
+	
+	//	hail may try and send a job
+	TJobReply Reply(JobAndChannel);
+	
+	Reply.mParams.AddDefaultParam("exiting...");
+	
+	TChannel& Channel = JobAndChannel;
+	Channel.OnJobCompleted(Reply);
+}
+
+
+void TPopPokey::OnGetStatus(TJobAndChannel& JobAndChannel)
+{
+	//	make up a status string
+	std::stringstream Status;
+	
+	//	list number of connected pokeys
+	int PokeyCount = 0;
+	int PokeyConnectedCount = 0;
+	mPokeysLock.lock();
+	for ( int i = 0; i < mPokeys.GetSize(); i++ )
+	{
+		PokeyCount++;
+
+		auto pChannel = GetChannel(mPokeys[i]->mChannelRef);
+		if ( pChannel )
+		{
+			if ( pChannel->IsConnected() )
+				PokeyConnectedCount++;
+		}
+	}
+	mPokeysLock.unlock();
+	
+	
+	Status << PokeyConnectedCount << "/" << PokeyCount << " pokeys connected" << std::endl;
+
+	
+	//	hail may try and send a job
+	TJobReply Reply(JobAndChannel);
+	
+	Reply.mParams.AddDefaultParam( Status.str() );
+	
+	TChannel& Channel = JobAndChannel;
+	Channel.OnJobCompleted(Reply);
+}
+
+
 void TPopPokey::OnListPokeys(TJobAndChannel& JobAndChannel)
 {
 	TJobReply Reply(JobAndChannel);

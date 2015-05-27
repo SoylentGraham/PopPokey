@@ -11,6 +11,7 @@
     <ClCompile Include="..\..\ofxSoylent\src\smallsha1\sha1.cpp" />
     <ClCompile Include="..\..\ofxSoylent\src\SoyApp.cpp" />
     <ClCompile Include="..\..\ofxSoylent\src\SoyArray.cpp" />
+    <ClCompile Include="..\..\ofxSoylent\src\SoyAssert.cpp" />
     <ClCompile Include="..\..\ofxSoylent\src\SoyDebug.cpp" />
     <ClCompile Include="..\..\ofxSoylent\src\SoyEvent.cpp" />
     <ClCompile Include="..\..\ofxSoylent\src\SoyMemFile.cpp" />
@@ -73,6 +74,7 @@
     <ClInclude Include="..\..\ofxSoylent\src\SortArray.h" />
     <ClInclude Include="..\..\ofxSoylent\src\SoyApp.h" />
     <ClInclude Include="..\..\ofxSoylent\src\SoyArray.h" />
+    <ClInclude Include="..\..\ofxSoylent\src\SoyAssert.h" />
     <ClInclude Include="..\..\ofxSoylent\src\SoyDebug.h" />
     <ClInclude Include="..\..\ofxSoylent\src\SoyEvent.h" />
     <ClInclude Include="..\..\ofxSoylent\src\SoyMemFile.h" />

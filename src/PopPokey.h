@@ -145,8 +145,10 @@ public:
 	void			OnDiscoverPokey(TJobAndChannel& JobAndChannel);
 	void			OnListPokeys(TJobAndChannel& JobChannel);
 	void			OnPopGridCoord(TJobAndChannel& JobAndChannel);
+	void			OnPeekGridCoord(TJobAndChannel& JobAndChannel);
 	void			OnPushGridCoord(TJobAndChannel& JobAndChannel);
 	void			OnPopLaserGateState(TJobAndChannel& JobAndChannel);
+	void			OnPeekLaserGateState(TJobAndChannel& JobAndChannel);
 	void			OnPushLaserGateState(TJobAndChannel& JobAndChannel);
 	void			OnUnknownPokeyReply(TJobAndChannel& JobAndChannel);
 	void			OnPokeyPollReply(TJobAndChannel& JobAndChannel);

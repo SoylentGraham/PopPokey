@@ -1,3 +1,6 @@
+#ignore office pokey
+ignorepokey 22961
+
 # office buttons
 setuppokey serial=22961 gridmap=1,1/15,2/27,3/	2,11/7,12/17,13/28,14/	1,21/11,22/29,23
 

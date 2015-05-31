@@ -30,6 +30,12 @@ std::ostream& operator<< (std::ostream &out,const TPokeyMeta &in)
 	static bool v = true;
 
 	out << in.mSerial << "{";
+	
+	if ( in.mIgnored )
+	{
+		out << "IGNORED;";
+	}
+	
 	if ( cr )
 	{
 		//	gr@ chrome on windows thinks there's some binary in this output and won#t display inline
@@ -153,7 +159,8 @@ bool TPokeyDiscoverThread::Iteration()
 
 
 
-TPollPokeyThread::TPollPokeyThread(TChannelManager& Channels) :
+TPollPokeyThread::TPollPokeyThread(TPokeyManager& PokeyManager,TChannelManager& Channels) :
+	mPokeyManager	( PokeyManager ),
 	mChannels		( Channels ),
 	SoyWorkerThread	( "TPollPokeyThread", SoyWorkerWaitMode::Sleep ),
 	mEnabled		( true )
@@ -203,9 +210,17 @@ void TPollPokeyThread::SendGetDeviceState()
 
 void TPollPokeyThread::SendJob(TJob& Job)
 {
-	for ( int i=0;	i<mPokeyChannels.GetSize();	i++ )
+	Array<std::shared_ptr<TPokeyMeta>> Pokeys;
+	mPokeyManager.GetPokeys( GetArrayBridge(Pokeys) );
+
+	for ( int i=0;	i<Pokeys.GetSize();	i++ )
 	{
-		auto pChannel = mChannels.GetChannel( mPokeyChannels[i] );
+		auto pPokey = Pokeys[i];
+		if ( !pPokey )
+			continue;
+		if ( pPokey->mIgnored )
+			continue;
+		auto pChannel = mChannels.GetChannel( pPokey->mChannelRef );
 		if ( !pChannel )
 			continue;
 		auto& Channel = *pChannel;
@@ -266,7 +281,7 @@ TPopPokey::TPopPokey() :
 
 	AddJobHandler( TJobParams::CommandReplyPrefix + TPokeyCommand::ToString( TPokeyCommand::GetDeviceState ), TParameterTraits(), *this, &TPopPokey::OnPokeyPollReply );
 	
-	mPollPokeyThread.reset( new TPollPokeyThread( static_cast<TChannelManager&>(*this) ) );
+	mPollPokeyThread.reset( new TPollPokeyThread( *this, static_cast<TChannelManager&>(*this) ) );
 	mDiscoverPokeyThread.reset( new TPokeyDiscoverThread( mDiscoverPokeyChannel ) );
 	
 	AddJobHandler("enablediscovery", TParameterTraits(), *this, &TPopPokey::OnEnableDiscovery);
@@ -277,6 +292,12 @@ TPopPokey::TPopPokey() :
 	TParameterTraits FakeDiscoverTraits;
 	FakeDiscoverTraits.mAssumedKeys.PushBack("count");
 	AddJobHandler("fakediscover", FakeDiscoverTraits, *this, &TPopPokey::OnFakeDiscoverPokeys );
+
+	
+	TParameterTraits IgnorePokeyTraits;
+	IgnorePokeyTraits.mAssumedKeys.PushBack("serial");
+	IgnorePokeyTraits.mDefaultParams.PushBack( std::make_tuple("ignore","1") );
+	AddJobHandler("IgnorePokey", IgnorePokeyTraits, *this, &TPopPokey::OnIgnorePokey );
 
 }
 
@@ -317,7 +338,7 @@ bool TPopPokey::AddChannel(std::shared_ptr<TChannel> Channel)
 	return true;
 }
 
-std::shared_ptr<TPokeyMeta> TPopPokey::GetPokey(const TPokeyMeta &Pokey)
+std::shared_ptr<TPokeyMeta> TPokeyManager::GetPokey(const TPokeyMeta &Pokey)
 {
 	std::lock_guard<std::mutex> lock(mPokeysLock);
 	for ( int i=0;	i<mPokeys.GetSize();	i++ )
@@ -332,7 +353,7 @@ std::shared_ptr<TPokeyMeta> TPopPokey::GetPokey(const TPokeyMeta &Pokey)
 	return nullptr;
 }
 
-std::shared_ptr<TPokeyMeta> TPopPokey::GetPokey(SoyRef ChannelRef)
+std::shared_ptr<TPokeyMeta> TPokeyManager::GetPokey(SoyRef ChannelRef)
 {
 	std::lock_guard<std::mutex> lock(mPokeysLock);
 	for ( int i=0;	i<mPokeys.GetSize();	i++ )
@@ -346,7 +367,7 @@ std::shared_ptr<TPokeyMeta> TPopPokey::GetPokey(SoyRef ChannelRef)
 }
 
 
-std::shared_ptr<TPokeyMeta> TPopPokey::GetPokey(int Serial,bool Create)
+std::shared_ptr<TPokeyMeta> TPokeyManager::GetPokey(int Serial,bool Create)
 {
 	std::lock_guard<std::mutex> lock(mPokeysLock);
 	for ( int i=0;	i<mPokeys.GetSize();	i++ )
@@ -469,14 +490,29 @@ void TPopPokey::OnDiscoverPokey(TJobAndChannel& JobAndChannel)
 	//	we cannot currently determine if the existing channel matches the address... this job won't come from the pokey's channel
 	if ( NewAddress || !Pokey->mChannelRef.IsValid() )
 	{
-		if ( !Pokey->HasBootupAddress() )
-			std::Debug << "skipping channel creation on pokey " << *Pokey << std::endl;
-		else if ( Pokey->mChannelRef.IsValid() )
-			std::Debug << "replacing channel on pokey " << *Pokey << std::endl;
-		else
-			std::Debug << "creating new channel on pokey " << *Pokey << std::endl;
+		bool CreateChannel = true;
 		
-		if ( !Pokey->HasBootupAddress() )
+		if ( Pokey->HasBootupAddress() )
+		{
+			std::Debug << "skipping channel creation on pokey (bootup ip) " << *Pokey << std::endl;
+			CreateChannel = false;
+		}
+		else if ( Pokey->mIgnored )
+		{
+			//	gr: commented out for now as it's a bit spammy
+			//std::Debug << "skipping channel creation on pokey (ignored) " << *Pokey << std::endl;
+			CreateChannel = false;
+		}
+		else if ( Pokey->mChannelRef.IsValid() )
+		{
+			std::Debug << "replacing channel on pokey " << *Pokey << std::endl;
+		}
+		else
+		{
+			std::Debug << "creating new channel on pokey " << *Pokey << std::endl;
+		}
+		
+		if ( CreateChannel )
 		{
 			//	create a new pokey channel
 			SoyRef ChannelRef(Soy::StreamToString(std::stringstream() << Serial).c_str());
@@ -485,8 +521,6 @@ void TPopPokey::OnDiscoverPokey(TJobAndChannel& JobAndChannel)
 			
 			std::shared_ptr<TChannel> PokeyChannel(new TChan<TChannelSocketTcpClient, TProtocolPokey>(Pokey->mChannelRef, Pokey->mAddress));
 			AddChannel(PokeyChannel);
-			if ( mPollPokeyThread )
-				mPollPokeyThread->AddPokeyChannel(PokeyChannel->GetChannelRef());
 		}
 	}
 	
@@ -517,7 +551,6 @@ void TPopPokey::OnInitPokey(TJobAndChannel& JobAndChannel)
 	//	create a new pokey channel
 	std::shared_ptr<TChannel> PokeyChannel( new TChan<TChannelSocketTcpClient,TProtocolPokey>( Ref, Address ) );
 	AddChannel( PokeyChannel );
-	mPollPokeyThread->AddPokeyChannel( PokeyChannel->GetChannelRef() );
 	
 	TJobReply Reply( JobAndChannel );
 	std::stringstream Debug;
@@ -596,9 +629,15 @@ void TPopPokey::OnGetStatus(TJobAndChannel& JobAndChannel)
 	mPokeysLock.lock();
 	for ( int i = 0; i < mPokeys.GetSize(); i++ )
 	{
+		auto& Pokey = mPokeys[i];
+		if ( !Pokey )
+			continue;
+		if ( Pokey->mIgnored )
+			continue;
+		
 		PokeyCount++;
 
-		auto pChannel = GetChannel(mPokeys[i]->mChannelRef);
+		auto pChannel = GetChannel(Pokey->mChannelRef);
 		if ( pChannel )
 		{
 			if ( pChannel->IsConnected() )
@@ -843,6 +882,29 @@ void TPopPokey::OnPeekLaserGateState(TJobAndChannel& JobAndChannel)
 }
 
 
+void TPopPokey::OnIgnorePokey(TJobAndChannel& JobAndChannel)
+{
+	auto& Job = JobAndChannel.GetJob();
+	
+	auto Serial = Job.mParams.GetParamAs<int>("serial");
+	auto NewIgnore = Job.mParams.GetParamAsWithDefault<int>("ignore",true);
+	
+	//	fetch pokey
+	std::shared_ptr<TPokeyMeta> Pokey = GetPokey(Serial, true);
+	
+	auto OldIgnore = Pokey->mIgnored;
+	Pokey->mIgnored = NewIgnore;
+
+	TJobReply Reply(JobAndChannel);
+	std::stringstream ReplyString;
+	ReplyString << "Updated Pokey " << ( *Pokey ) << ", " << (NewIgnore ? "IGNORED" : "NOT ignored" ) << ", was " << ( OldIgnore ? "IGNORED" : "NOT ignored" ) << std::endl;
+	
+	Reply.mParams.AddDefaultParam(ReplyString.str());
+	
+	
+	TChannel& Channel = JobAndChannel;
+	Channel.OnJobCompleted(Reply);
+}
 
 void TPopPokey::OnUnknownPokeyReply(TJobAndChannel& JobAndChannel)
 {

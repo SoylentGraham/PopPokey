@@ -62,7 +62,8 @@ public:
 public:
 	TPokeyMeta() :
 		mSerial			( -1 ),
-		mDhcpEnabled	( false )
+		mDhcpEnabled	( false ),
+		mIgnored		( false )
 	{
 	}
 	
@@ -85,21 +86,35 @@ public:
 	SoyRef				mChannelRef;
 	std::string			mVersion;
 	bool				mDhcpEnabled;
+	bool				mIgnored;		//	gr: fix double negative!
 };
 std::ostream& operator<< (std::ostream &out,const TPokeyMeta &in);
 
 
+class TPokeyManager
+{
+public:
+	std::shared_ptr<TPokeyMeta>	GetPokey(const TPokeyMeta& Pokey);
+	std::shared_ptr<TPokeyMeta>	GetPokey(int Serial,bool Create=false);
+	std::shared_ptr<TPokeyMeta>	GetPokey(SoyRef ChannelRef);
+
+	void	GetPokeys(ArrayBridge<std::shared_ptr<TPokeyMeta>>&& Pokeys)
+	{
+		std::lock_guard<std::mutex> Lock( mPokeysLock );
+		Pokeys.Copy( mPokeys );
+	}
+	
+protected:
+	std::mutex			mPokeysLock;	//	for when resizing array
+	Array<std::shared_ptr<TPokeyMeta>>	mPokeys;
+};
+
 class TPollPokeyThread : public SoyWorkerThread
 {
 public:
-	TPollPokeyThread(TChannelManager& Channels);
+	TPollPokeyThread(TPokeyManager& PokeyManager,TChannelManager& Channels);
 
 	virtual bool		Iteration() override;
-
-	void				AddPokeyChannel(SoyRef ChannelRef)
-	{
-		mPokeyChannels.PushBack( ChannelRef );
-	}
 
 	bool			IsEnabled() const { return mEnabled; }
 	void			Enable(bool Enable) { mEnabled = Enable; }
@@ -112,7 +127,7 @@ public:
 	void				SendJob(TJob& Job);
 	
 private:
-	Array<SoyRef>		mPokeyChannels;
+	TPokeyManager&		mPokeyManager;
 	TChannelManager&	mChannels;
 	bool				mEnabled;
 };
@@ -134,7 +149,7 @@ public:
 };
 
 
-class TPopPokey : public TJobHandler, public TChannelManager
+class TPopPokey : public TJobHandler, public TChannelManager, public TPokeyManager
 {
 public:
 	TPopPokey();
@@ -161,10 +176,8 @@ public:
 	void			OnEnablePoll(TJobAndChannel& JobAndChannel);
 	void			OnDisablePoll(TJobAndChannel& JobAndChannel);
 	void			OnFakeDiscoverPokeys(TJobAndChannel& JobAndChannel);
+	void			OnIgnorePokey(TJobAndChannel& JobAndChannel);
 
-	std::shared_ptr<TPokeyMeta>	GetPokey(const TPokeyMeta& Pokey);
-	std::shared_ptr<TPokeyMeta>	GetPokey(int Serial,bool Create=false);
-	std::shared_ptr<TPokeyMeta>	GetPokey(SoyRef ChannelRef);
 
 	void			UpdatePinState(TPokeyMeta& Pokey,const ArrayBridge<char>& Pins);
 	void			UpdatePinState(TPokeyMeta& Pokey,uint64 Pins);
@@ -180,9 +193,7 @@ public:
 	std::shared_ptr<TPollPokeyThread>	mPollPokeyThread;
 
 	std::shared_ptr<TChannel>	mDiscoverPokeyChannel;
-	
-	std::mutex					mPokeysLock;	//	for when resizing array
-	Array<std::shared_ptr<TPokeyMeta>>			mPokeys;
+
 	
 	std::mutex					mLastGridCoordLock;
 	vec2x<int>					mLastGridCoord;

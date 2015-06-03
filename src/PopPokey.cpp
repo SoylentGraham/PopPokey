@@ -20,6 +20,7 @@ const vec2x<int> TPokeyMeta::GridCoordLaserGate = vec2x<int>(-99,-99);
 const vec2x<int> TPokeyMeta::GridCoordInvalid = vec2x<int>(-1,-1);
 const char* TPokeyMeta::LaserGateOnReply = "lasergate_on";
 const char* TPokeyMeta::LaserGateOffReply = "lasergate_off";
+float TPokeyMeta::PinDownTooLong = 2.f;
 
 
 std::ostream& operator<< (std::ostream &out,const TPokeyMeta &in)
@@ -71,10 +72,15 @@ std::ostream& operator<< (std::ostream &out,const vec2x<int> &in)
 }
 
 
+TPinMeta::TPinMeta() :
+	mDownDuration	( 0 ),
+	mCoord			( TPokeyMeta::GridCoordInvalid )
+{
+	
+}
+
 bool TPokeyMeta::SetGridMap(std::string GridMapString,std::stringstream& Error)
 {
-	mPinToGridMap.Clear();
-	
 	//	repalce tab
 	for ( int i = 0; i < GridMapString.length(); i++ )
 		if ( GridMapString[i] == '\t' )
@@ -92,18 +98,13 @@ bool TPokeyMeta::SetGridMap(std::string GridMapString,std::stringstream& Error)
 	//	convert to indexes
 	for ( int i=0;	i<IndexStrings.GetSize();	i++ )
 	{
-		if ( mPinToGridMap.IsFull() )
-		{
-			Error << "grid map indexes full (" << mPinToGridMap.GetSize() << ")";
-			return false;
-		}
-		
 		auto& IndexString = IndexStrings[i];
 		
 		//	special case
 		if ( IndexString == "lasergate" )
 		{
-			mPinToGridMap.PushBack( TPokeyMeta::GridCoordLaserGate );
+			auto& Pin = GetPin(i);
+			Pin.mCoord = TPokeyMeta::GridCoordLaserGate;
 			continue;
 		}
 		
@@ -123,13 +124,141 @@ bool TPokeyMeta::SetGridMap(std::string GridMapString,std::stringstream& Error)
 			return false;
 		}
 		
-		mPinToGridMap.PushBack( Coord );
+		auto& Pin = GetPin(i);
+		Pin.mCoord = Coord;
 	}
 	
 	return true;
 }
 
+namespace Soy
+{
+	template<typename TYPE>
+	void Clamp(TYPE& Value,const TYPE& Min,const TYPE& Max)
+	{
+		if ( Value < Min )
+			Value = Min;
+		if ( Value > Max )
+			Value = Max;
+	}
+}
+
+vec2x<int> TPokeyMeta::UpdatePins(const ArrayBridge<bool> &Pins)
+{
+	//	get delta
+	SoyTime Now(true);
+	if ( !mLastUpdate.IsValid() )
+		mLastUpdate = Now;
+	float Delta = (Now.GetTime() - mLastUpdate.GetTime()) / 1000.0f;
+	mLastUpdate = Now;
+
+	//	catch errors
+	Soy::Clamp( Delta, 0.f, 1.f );
 	
+	vec2x<int> Result = GridCoordInvalid;
+
+	//	update each pin
+	for ( int i=0;	i<Pins.GetSize();	i++ )
+	{
+		bool PinDown = Pins[i];
+		auto& Pin = GetPin(i);
+		
+		//	update how long the pin has been down (or reset)
+		if ( PinDown )
+			Pin.mDownDuration += Delta;
+		else
+			Pin.mDownDuration = 0;
+
+		//	not down, nothging else to do
+		if ( !PinDown )
+			continue;
+
+		//	check if pin is being ignored
+		if ( IsPinIgnored(i) )
+			continue;
+
+		//	set as result
+		auto PinGridCoord = GetPinGridCoord(i);
+		if ( PinGridCoord == TPokeyMeta::GridCoordInvalid )
+		{
+			std::Debug << "Warning: pin " << i << " down that's out of grid-map range on " << (*this) << std::endl;
+			continue;
+		}
+		
+		Result = PinGridCoord;
+	}
+	
+	return Result;
+}
+
+bool TPokeyMeta::IsPinIgnored(size_t Pin)
+{
+	//	oob
+	if ( Pin >= mPins.GetSize() )
+		return false;
+	
+	auto Duration = mPins[Pin].mDownDuration;
+	if ( Duration < TPokeyMeta::PinDownTooLong )
+		return false;
+	
+	return true;
+}
+
+
+vec2x<int> TPokeyMeta::GetPinGridCoord(size_t Pin)
+{
+	//	oob
+	if ( Pin >= mPins.GetSize() )
+		return TPokeyMeta::GridCoordInvalid;
+	
+	return mPins[Pin].mCoord;
+}
+
+
+float TPokeyMeta::GetPinDownDuration(size_t Pin)
+{
+	//	oob
+	if ( Pin >= mPins.GetSize() )
+		return -1.0f;
+	
+	return mPins[Pin].mDownDuration;
+}
+
+
+TPinMeta& TPokeyMeta::GetPin(size_t Pin)
+{
+	//	if OOB, then the array hasn't been initialised (maybe no grid layout), but we still want meta for duration etc
+	if ( Pin >= mPins.GetSize() )
+	{
+		mPins.SetSize( Pin+1 );
+	}
+
+	return mPins[Pin];
+}
+
+float TPokeyMeta::GetTimeSinceUpdate() const
+{
+	//	never heard from
+	if ( !mLastUpdate.IsValid() )
+		return -1;
+	
+	SoyTime Now(true);
+	auto DeltaMs = Now.GetTime() - mLastUpdate.GetTime();
+	return DeltaMs / 1000.f;
+}
+
+void TPokeyMeta::GetIgnoredPins(ArrayBridge<size_t>&& IgnoredPins)
+{
+	for ( int p=0;	p<mPins.GetSize();	p++ )
+	{
+		if ( !IsPinIgnored(p) )
+			continue;
+		
+		IgnoredPins.PushBack(p);
+	}
+}
+
+
 TPokeyDiscoverThread::TPokeyDiscoverThread(std::shared_ptr<TChannel>& Channel) :
 	mChannel		( Channel ),
 	SoyWorkerThread	( Soy::GetTypeName(*this), SoyWorkerWaitMode::Sleep ),
@@ -409,7 +538,7 @@ void TPopPokey::OnPokeyPollReply(TJobAndChannel& JobAndChannel)
 	}
 	
 	//std::Debug << "pins: " << Job.mParams.GetParamAs<std::string>("pins") << std::endl;
-	
+
 	UpdatePinState( *Pokey, GetArrayBridge(Pins) );
 }
 
@@ -618,25 +747,26 @@ void TPopPokey::OnExit(TJobAndChannel& JobAndChannel)
 }
 
 
-void TPopPokey::OnGetStatus(TJobAndChannel& JobAndChannel)
+void TPopPokey::GetConnectedStatus(std::ostream& Status)
 {
-	//	make up a status string
-	std::stringstream Status;
-	
 	//	list number of connected pokeys
 	int PokeyCount = 0;
 	int PokeyConnectedCount = 0;
-	mPokeysLock.lock();
-	for ( int i = 0; i < mPokeys.GetSize(); i++ )
+	
+	//	copy pokeys to reduce lock contention
+	Array<std::shared_ptr<TPokeyMeta>> Pokeys;
+	GetPokeys( GetArrayBridge(Pokeys) );
+	
+	for ( int i = 0; i < Pokeys.GetSize(); i++ )
 	{
-		auto& Pokey = mPokeys[i];
+		auto& Pokey = Pokeys[i];
 		if ( !Pokey )
 			continue;
 		if ( Pokey->mIgnored )
 			continue;
 		
 		PokeyCount++;
-
+		
 		auto pChannel = GetChannel(Pokey->mChannelRef);
 		if ( pChannel )
 		{
@@ -644,15 +774,57 @@ void TPopPokey::OnGetStatus(TJobAndChannel& JobAndChannel)
 				PokeyConnectedCount++;
 		}
 	}
-	mPokeysLock.unlock();
-	
-	
-	Status << PokeyConnectedCount << "/" << PokeyCount << " pokeys connected" << std::endl;
 
+	Status << PokeyConnectedCount << "/" << PokeyCount << " pokeys connected" << std::endl;
+}
+
+
+
+void TPopPokey::GetIgnoredPinStatus(std::ostream& Status)
+{
+	//	list any pokeys with ignored pins
+
+	Array<std::shared_ptr<TPokeyMeta>> Pokeys;
+	GetPokeys( GetArrayBridge(Pokeys) );
 	
-	//	hail may try and send a job
+	for ( int p = 0; p < Pokeys.GetSize(); p++ )
+	{
+		auto& pPokey = Pokeys[p];
+		if ( !pPokey )
+			continue;
+		auto& Pokey = *pPokey;
+		if ( Pokey.mIgnored )
+			continue;
+		
+		//	get list of ignored pins
+		BufferArray<size_t,100> IgnoredPins;
+		Pokey.GetIgnoredPins( GetArrayBridge(IgnoredPins) );
+		
+		if ( IgnoredPins.IsEmpty() )
+			continue;
+		
+		Status << Pokey << " ignoring pins ";
+		for ( int ipi=0;	ipi<IgnoredPins.GetSize();	ipi++ )
+		{
+			auto Pin = IgnoredPins[ipi];
+			//	gr: display pin indexes from 1
+			Status << (Pin+1) << "(" << Pokey.GetPinGridCoord(Pin) << "; " << Pokey.GetPinDownDuration(Pin) << "secs) ";
+		}
+		Status << std::endl;
+	}
+}
+
+
+
+void TPopPokey::OnGetStatus(TJobAndChannel& JobAndChannel)
+{
+	//	make up a status string
+	std::stringstream Status;
+	
+	GetConnectedStatus( Status );
+	GetIgnoredPinStatus( Status );
+	
 	TJobReply Reply(JobAndChannel);
-	
 	Reply.mParams.AddDefaultParam( Status.str() );
 	
 	TChannel& Channel = JobAndChannel;
@@ -665,11 +837,18 @@ void TPopPokey::OnListPokeys(TJobAndChannel& JobAndChannel)
 	TJobReply Reply(JobAndChannel);
 
 	std::stringstream ReplyString;
-	mPokeysLock.lock();
-	for ( int i = 0; i < mPokeys.GetSize(); i++ )
+	Array<std::shared_ptr<TPokeyMeta>> Pokeys;
+	GetPokeys( GetArrayBridge(Pokeys) );
+
+	for ( int i = 0; i < Pokeys.GetSize(); i++ )
 	{
 		//	get channel state
-		auto pChannel = GetChannel(mPokeys[i]->mChannelRef);
+		auto& pPokey = Pokeys[i];
+		if ( !pPokey )
+			continue;
+		auto& Pokey = *pPokey;
+		
+		auto pChannel = GetChannel(Pokey.mChannelRef);
 		std::string ConnectionStatus;
 		if ( !pChannel )
 			ConnectionStatus = "never connected";
@@ -678,10 +857,17 @@ void TPopPokey::OnListPokeys(TJobAndChannel& JobAndChannel)
 		else
 			ConnectionStatus = "connected";
 
-		ReplyString << *mPokeys[i] << " " << ConnectionStatus << std::endl;
-	}
-	mPokeysLock.unlock();
+		auto TimeSinceUpdate = Pokey.GetTimeSinceUpdate();
+		
+		ReplyString << Pokey << " " << ConnectionStatus;
+		
+		if ( TimeSinceUpdate >= 0.f )
+			ReplyString << " (" << TimeSinceUpdate << "s ago)";
 
+		ReplyString << std::endl;
+	}
+
+	
 	Reply.mParams.AddDefaultParam(ReplyString.str());
 
 	TChannel& Channel = JobAndChannel;
@@ -944,22 +1130,20 @@ bool TPopPokey::EnablePoll(bool Enable, bool& OldState)
 
 void TPopPokey::UpdatePinState(TPokeyMeta& Pokey,const ArrayBridge<char>& Pins)
 {
+	//	convert pin chars to bools
+	Array<bool> PinBools;
 	for ( int i=0;	i<Pins.GetSize();	i++ )
 	{
-		bool PinDown = (Pins[i]!='0');
-		
-		if ( !PinDown )
-			continue;
-
-		//	turn pin to grid index
-		if ( i >= Pokey.mPinToGridMap.GetSize() )
-		{
-			std::Debug << "Warning: pin " << i << " down that's out of grid-map range on " << Pokey << std::endl;
-			continue;
-		}
-
-		PushGridCoord( Pokey.mPinToGridMap[i] );
+		bool PinDown = (Pins[i] != '0');
+		PinBools.PushBack(PinDown);
 	}
+	
+	auto GridDown = Pokey.UpdatePins( GetArrayBridge(PinBools) );
+	if ( GridDown != TPokeyMeta::GridCoordInvalid )
+	{
+		PushGridCoord( GridDown );
+	}
+	
 }
 
 

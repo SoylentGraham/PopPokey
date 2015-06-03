@@ -49,15 +49,26 @@ public:
 	
 */
 
+class TPinMeta
+{
+public:
+	TPinMeta();
+
+public:
+	vec2x<int>	mCoord;
+	float		mDownDuration;	//	to detect stuck pins we increment/reset how long a pin has been held down
+};
+
 class TPokeyMeta
 {
 public:
-	static const char* CoordDelim;
-	static const char* CoordComponentDelim;
-	static const vec2x<int> GridCoordLaserGate;
-	static const vec2x<int> GridCoordInvalid;
-	static const char* LaserGateOnReply;
-	static const char* LaserGateOffReply;
+	static const char*	CoordDelim;
+	static const char*	CoordComponentDelim;
+	static const vec2x<int>	GridCoordLaserGate;
+	static const vec2x<int>	GridCoordInvalid;
+	static const char*	LaserGateOnReply;
+	static const char*	LaserGateOffReply;
+	static float		PinDownTooLong;		//	if the pin has been down this long, ignore it
 	
 public:
 	TPokeyMeta() :
@@ -72,21 +83,39 @@ public:
 	bool			SetGridMap(std::string GridMapString,std::stringstream& Error);
 	std::string		GetGridMapString() const
 	{
-		return Soy::StringJoin( GetArrayBridge(mPinToGridMap), CoordDelim );
+		Array<vec2x<int>> PinToGridMap;
+		for ( int p=0;	p<mPins.GetSize();	p++ )
+		{
+			PinToGridMap.PushBack( mPins[p].mCoord );
+		}
+		return Soy::StringJoin( GetArrayBridge(PinToGridMap), CoordDelim );
 	}
 	size_t			GetGridMapCount() const
 	{
-		return mPinToGridMap.GetSize();
+		return mPins.GetSize();
 	}
 
+	vec2x<int>			UpdatePins(const ArrayBridge<bool>& Pins);	//	returns coord if a pin down
+	
+	void				UpdatePin(size_t Pin,bool PinDown,float Delta);
+	bool				IsPinIgnored(size_t Pin);		//	gr: remove double negative
+	void				GetIgnoredPins(ArrayBridge<size_t>&& IgnoredPins);
+	vec2x<int>			GetPinGridCoord(size_t Pin);
+	float				GetPinDownDuration(size_t Pin);
+	
+	TPinMeta&			GetPin(size_t Pin);
+	float				GetTimeSinceUpdate() const;			//	how long ago did we hear from this pokey
+	
 public:
-	BufferArray<vec2x<int>,100>	mPinToGridMap;
+	//	gr: merge these into a pin struct
+	BufferArray<TPinMeta,100>	mPins;
 	std::string			mAddress;
 	int					mSerial;
 	SoyRef				mChannelRef;
 	std::string			mVersion;
 	bool				mDhcpEnabled;
 	bool				mIgnored;		//	gr: fix double negative!
+	SoyTime				mLastUpdate;
 };
 std::ostream& operator<< (std::ostream &out,const TPokeyMeta &in);
 
@@ -180,11 +209,13 @@ public:
 
 
 	void			UpdatePinState(TPokeyMeta& Pokey,const ArrayBridge<char>& Pins);
-	void			UpdatePinState(TPokeyMeta& Pokey,uint64 Pins);
 	void			PushGridCoord(vec2x<int> GridCoord);
 	void			PushLaserGateState(bool State);
 	bool			EnableDiscovery(bool Enable, bool& OldState);
 	bool			EnablePoll(bool Enable, bool& OldState);
+
+	void			GetConnectedStatus(std::ostream& Status);
+	void			GetIgnoredPinStatus(std::ostream& Status);
 
 public:
 	Soy::Platform::TConsoleApp	mConsoleApp;

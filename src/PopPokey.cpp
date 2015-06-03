@@ -12,7 +12,7 @@
 #include <SortArray.h>
 #include <TChannelLiteral.h>
 #include <RemoteArray.h>
-
+#include <TChannelFile.h>
 
 const char* TPokeyMeta::CoordDelim = "/";
 const char* TPokeyMeta::CoordComponentDelim = ",";
@@ -1216,56 +1216,23 @@ TPopAppError::Type PopMain(TJobParams& Params)
 		Job.mChannelMeta.mClientRef = SoyRef();
 		gStdioChannel->SendCommand( Job );
 	};
+	
 	CommandLineChannel->mOnJobSent.AddListener( RelayFunc );
 	CommandLineChannel->mOnJobRecieved.AddListener( RelayFunc );
 
 	
 	
 	
-	//	bootup commands
+	//	bootup commands via a channel
 	std::string ConfigFilename = Params.GetParamAs<std::string>("config");
 	if ( ConfigFilename.empty() )
 		ConfigFilename = "bootup.txt";
+	std::shared_ptr<TChannel> BootupChannel( new TChan<TChannelFileRead,TProtocolCli>( SoyRef("Bootup"), ConfigFilename ) );
+
+	//	display reply to stdout
+	BootupChannel->mOnJobRecieved.AddListener( RelayFunc );
 	
-	Array<std::string> Commands;
-
-	//	parse command file
-	std::stringstream ConfigFileError;
-
-	if (!Soy::FileToStringLines(ConfigFilename, GetArrayBridge(Commands), ConfigFileError))
-	{
-		std::Debug << "failed to load " << ConfigFilename << "... using debug init commands" << std::endl;
-		Commands.PushBack("setuppokey serial=21244 gridmap=0,0/1,0/2,0");
-		Commands.PushBack("setuppokey serial=22961 gridmap=0,1/1,1/2,1");
-		Commands.PushBack("setuppokey serial=22962 gridmap=lasergate");
-	}
-
-	if ( !ConfigFileError.str().empty() )
-		std::Debug << "config file " << ConfigFilename << " error: " << ConfigFileError.str() << std::endl;
-
-	for ( int i=0;	i<Commands.GetSize();	i++ )
-	{
-		auto Command = Commands[i];
-
-		//	comment
-		if ( Command.empty() || Command[0] == '#' )
-			continue;
-
-		TProtocolCli Protocol;
-		TJob Job;
-		if ( !Protocol.DecodeHeader( Job, Command ) )
-		{
-			std::Debug << "Couldn't decode config command: " << Command << std::endl;
-			continue;
-		}
-		CommandLineChannel->Execute( Job.mParams.mCommand, Job.mParams );
-		CommandLineChannel->mOnJobRecieved.AddListener( RelayFunc );
-	}
-
-	
-	
-	
-	
+	App.AddChannel( BootupChannel );
 	
 	
 	//	run

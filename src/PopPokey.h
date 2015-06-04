@@ -178,7 +178,7 @@ public:
 };
 
 
-class TPopPokey : public TJobHandler, public TChannelManager, public TPokeyManager
+class TPopPokey : public TJobHandler, public TPopJobHandler, public TChannelManager, public TPokeyManager
 {
 public:
 	TPopPokey();
@@ -206,7 +206,6 @@ public:
 	void			OnDisablePoll(TJobAndChannel& JobAndChannel);
 	void			OnFakeDiscoverPokeys(TJobAndChannel& JobAndChannel);
 	void			OnIgnorePokey(TJobAndChannel& JobAndChannel);
-
 
 	void			UpdatePinState(TPokeyMeta& Pokey,const ArrayBridge<char>& Pins);
 	void			PushGridCoord(vec2x<int> GridCoord);

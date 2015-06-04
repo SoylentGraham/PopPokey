@@ -368,7 +368,8 @@ void TPollPokeyThread::SendJob(TJob& Job)
 
 TPopPokey::TPopPokey() :
 	TJobHandler		( static_cast<TChannelManager&>(*this) ),
-	mLastGridCoord	( TPokeyMeta::GridCoordInvalid )
+	mLastGridCoord	( TPokeyMeta::GridCoordInvalid ),
+	TPopJobHandler	( static_cast<TJobHandler&>(*this) )
 {
 	TParameterTraits InitPokeyTraits;
 	InitPokeyTraits.mAssumedKeys.PushBack("ref");
@@ -1100,6 +1101,7 @@ void TPopPokey::OnUnknownPokeyReply(TJobAndChannel& JobAndChannel)
 	std::Debug << "got pokey reply from " << Channel.GetChannelRef() << ": RequestId #" << Job.mParams.GetParamAs<int>("requestid") << std::endl;
 	std::Debug << Job.mParams << std::endl;
 }
+
 
 bool TPopPokey::EnableDiscovery(bool Enable, bool& OldState)
 {

@@ -41,6 +41,8 @@ public:
 	{
 	}
 	
+	virtual TProtocolMeta	GetMeta() const override	{	return TProtocolMeta("pokey");	}
+
 	virtual TDecodeResult::Type	DecodeHeader(TJob& Job,TChannelStream& Stream) override;
 	virtual TDecodeResult::Type	DecodeData(TJob& Job,TChannelStream& Stream) override;
 	
